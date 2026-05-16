@@ -54,16 +54,19 @@
         </div>
         {{ end }}
 
-        <div class="source-selector">
+        <div class="source-selector" id="source-selector">
             <div class="source-header">
-                <span class="source-title">搜索源设置</span>
-                <div>
+                <button type="button" class="source-collapse-btn" onclick="toggleSourceSelector()" aria-expanded="true" aria-controls="source-grid">
+                    <span class="source-title">搜索源设置</span>
+                    <i class="fa-solid fa-chevron-up source-collapse-icon" aria-hidden="true"></i>
+                </button>
+                <div class="source-actions">
                     <button type="button" class="ctrl-btn" id="btn-all">全选</button>
                     <button type="button" class="ctrl-btn" id="btn-none">清空</button>
                 </div>
             </div>
 
-            <div class="source-grid">
+            <div class="source-grid" id="source-grid">
                 {{ range $source := .AllSources }}
                 <label>
                     <input type="checkbox" name="sources" value="{{ $source }}" class="source-checkbox"

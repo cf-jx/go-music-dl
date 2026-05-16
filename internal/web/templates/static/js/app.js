@@ -637,6 +637,60 @@ function bindSourceSelectorButtons(root = document) {
     }
 }
 
+function isMobileSourceSelectorViewport() {
+    try {
+        return window.matchMedia('(max-width: 720px)').matches;
+    } catch (_) {
+        return (window.innerWidth || 0) <= 720;
+    }
+}
+
+function applySourceSelectorCollapsed(selector, collapsed) {
+    if (!selector) return;
+    selector.classList.toggle('is-collapsed', !!collapsed);
+    const btn = selector.querySelector('.source-collapse-btn');
+    if (btn) btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+}
+
+function toggleSourceSelector(force) {
+    const selector = document.getElementById('source-selector');
+    if (!selector) return;
+    if (!isMobileSourceSelectorViewport()) return;
+    const collapsed = typeof force === 'boolean'
+        ? force
+        : !selector.classList.contains('is-collapsed');
+    applySourceSelectorCollapsed(selector, collapsed);
+    try {
+        sessionStorage.setItem('sourceSelectorCollapsed', collapsed ? '1' : '0');
+    } catch (_) {
+    }
+}
+
+function initSourceSelectorCollapse(root = document) {
+    const scope = root && typeof root.querySelector === 'function' ? root : document;
+    const selector = scope.querySelector('#source-selector');
+    if (!selector) return;
+    if (selector.dataset.collapseInit === '1') return;
+    selector.dataset.collapseInit = '1';
+
+    const isMobile = isMobileSourceSelectorViewport();
+    let collapsed;
+    try {
+        const stored = sessionStorage.getItem('sourceSelectorCollapsed');
+        if (stored === '1' || stored === '0') {
+            collapsed = stored === '1';
+        }
+    } catch (_) {
+    }
+    if (typeof collapsed !== 'boolean') {
+        collapsed = isMobile;
+    }
+    if (!isMobile) {
+        collapsed = false;
+    }
+    applySourceSelectorCollapsed(selector, collapsed);
+}
+
 function bindSearchForm(root = document) {
     const searchForm = root.querySelector('#search-form');
     if (!searchForm) return;
@@ -696,6 +750,7 @@ function bindSongCardCovers(root = document) {
 
 function initializePageContent(root = document) {
     bindSourceSelectorButtons(root);
+    initSourceSelectorCollapse(root);
     bindSearchForm(root);
 
     const initialTypeEl = root.querySelector('input[name="type"]:checked');

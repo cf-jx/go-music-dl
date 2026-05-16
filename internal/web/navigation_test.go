@@ -284,6 +284,62 @@ func TestAppUpdateModalIsAboutOnly(t *testing.T) {
 	}
 }
 
+func TestSearchSourceSelectorSupportsMobileCollapse(t *testing.T) {
+	htmlContent, err := templateFS.ReadFile("templates/partials/search_box.html")
+	if err != nil {
+		t.Fatalf("ReadFile(search_box.html): %v", err)
+	}
+	html := string(htmlContent)
+	for _, want := range []string{
+		`id="source-selector"`,
+		`class="source-collapse-btn"`,
+		`onclick="toggleSourceSelector()"`,
+		`aria-controls="source-grid"`,
+		`fa-chevron-up source-collapse-icon`,
+		`id="source-grid"`,
+		`class="source-actions"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("search_box.html missing collapse token %q", want)
+		}
+	}
+
+	cssContent, err := templateFS.ReadFile("templates/static/css/style.css")
+	if err != nil {
+		t.Fatalf("ReadFile(style.css): %v", err)
+	}
+	css := string(cssContent)
+	for _, want := range []string{
+		`.source-selector.is-collapsed .source-grid { display: none; }`,
+		`.source-selector.is-collapsed .source-collapse-icon { transform: rotate(180deg); }`,
+		`@media (max-width: 720px)`,
+		`.source-collapse-icon { display: inline-block; }`,
+	} {
+		if !strings.Contains(css, want) {
+			t.Fatalf("style.css missing collapse rule %q", want)
+		}
+	}
+
+	jsContent, err := templateFS.ReadFile("templates/static/js/app.js")
+	if err != nil {
+		t.Fatalf("ReadFile(app.js): %v", err)
+	}
+	js := string(jsContent)
+	for _, want := range []string{
+		`function toggleSourceSelector(force)`,
+		`function initSourceSelectorCollapse(root = document)`,
+		`function isMobileSourceSelectorViewport()`,
+		`function applySourceSelectorCollapsed(selector, collapsed)`,
+		`'(max-width: 720px)'`,
+		`sessionStorage.setItem('sourceSelectorCollapsed'`,
+		`initSourceSelectorCollapse(root);`,
+	} {
+		if !strings.Contains(js, want) {
+			t.Fatalf("app.js missing collapse helper %q", want)
+		}
+	}
+}
+
 func TestPaginationTemplatesExposeShortcutMetadata(t *testing.T) {
 	paths := []string{
 		"templates/partials/song_list.html",
