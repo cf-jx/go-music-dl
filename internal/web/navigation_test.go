@@ -246,6 +246,7 @@ func TestSettingsModalIncludesDownloadDirPresets(t *testing.T) {
 		`id="setting-download-dir-preset"`,
 		`id="setting-download-filename-template"`,
 		`id="setting-floating-lyrics"`,
+		`id="setting-auto-switch-invalid-sources"`,
 		`onclick="openAboutAppModal()"`,
 		`关于 go-music-dl`,
 		`class="cookie-item setting-item setting-link-row"`,

@@ -49,6 +49,7 @@ type WebSettings struct {
 	CliPageSize              int    `json:"cliPageSize"`
 	DownloadConcurrency      int    `json:"downloadConcurrency"`
 	AutoCheckUpdate          bool   `json:"autoCheckUpdate"`
+	AutoSwitchInvalidSources bool   `json:"autoSwitchInvalidSources"`
 	UpdateRepoURL            string `json:"updateRepoUrl"`
 	GithubProxyEnabled       bool   `json:"githubProxyEnabled"`
 	GithubProxyURL           string `json:"githubProxyUrl"`
@@ -168,6 +169,7 @@ func defaultWebSettings() WebSettings {
 		CliPageSize:              DefaultCLIPageSize,
 		DownloadConcurrency:      DefaultWebConcurrency,
 		AutoCheckUpdate:          true,
+		AutoSwitchInvalidSources: true,
 		UpdateRepoURL:            DefaultUpdateRepoURL,
 		GithubProxyEnabled:       false,
 		GithubProxyURL:           DefaultGithubProxyURL,

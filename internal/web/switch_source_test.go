@@ -44,6 +44,34 @@ func TestAppJSBatchSwitchSourceUsesConcurrentWorkers(t *testing.T) {
 	}
 }
 
+func TestAppJSAutoSwitchInvalidSources(t *testing.T) {
+	content, err := templateFS.ReadFile("templates/static/js/app.js")
+	if err != nil {
+		t.Fatalf("ReadFile(app.js): %v", err)
+	}
+
+	js := string(content)
+	for _, want := range []string{
+		"autoSwitchInvalidSources: true",
+		"function scheduleAutoSwitchInvalidSources",
+		"async function autoSwitchInvalidSources()",
+		"card.dataset.autoSwitchInvalidAttempted = '1'",
+		"selectInvalidSongCards({ silent: true, cards: invalidCards })",
+		"await batchSwitchSource({ skipConfirm: true, silent: true, auto: true, cards: invalidCards })",
+		"if (document.querySelector('.tag-fail'))",
+		"card.dataset.inspectPending = '1'",
+		"async function batchSwitchSource(options = {})",
+		"if (!options.skipConfirm && !confirm",
+		"clearSongCardSelection(card, { deferToolbar: !!options.deferToolbar })",
+		"options.cards.filter(card => card && card.isConnected)",
+		"if (!shouldCheck && options.clearExisting !== false)",
+	} {
+		if !strings.Contains(js, want) {
+			t.Fatalf("app.js missing %q", want)
+		}
+	}
+}
+
 func TestFindBestSwitchSongReturnsBeforeSlowSourcesOnHighConfidenceMatch(t *testing.T) {
 	withSwitchSourceTestHooks(t)
 

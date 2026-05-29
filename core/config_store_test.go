@@ -110,6 +110,9 @@ func TestWebSettingsDefaultAndPersist(t *testing.T) {
 	if !defaults.AutoCheckUpdate {
 		t.Fatalf("default AutoCheckUpdate should be true")
 	}
+	if !defaults.AutoSwitchInvalidSources {
+		t.Fatalf("default AutoSwitchInvalidSources should be true")
+	}
 	if defaults.UpdateRepoURL != DefaultUpdateRepoURL {
 		t.Fatalf("default UpdateRepoURL mismatch: got %q want %q", defaults.UpdateRepoURL, DefaultUpdateRepoURL)
 	}
@@ -142,6 +145,7 @@ func TestWebSettingsDefaultAndPersist(t *testing.T) {
 		CliPageSize:              120,
 		DownloadConcurrency:      5,
 		AutoCheckUpdate:          false,
+		AutoSwitchInvalidSources: false,
 		UpdateRepoURL:            "https://github.com/example/fork",
 		GithubProxyEnabled:       true,
 		GithubProxyURL:           "https://gh-proxy.com/",
@@ -164,6 +168,7 @@ func TestWebSettingsDefaultAndPersist(t *testing.T) {
 		CliPageSize:              120,
 		DownloadConcurrency:      5,
 		AutoCheckUpdate:          false,
+		AutoSwitchInvalidSources: false,
 		UpdateRepoURL:            "https://github.com/example/fork",
 		GithubProxyEnabled:       true,
 		GithubProxyURL:           "https://gh-proxy.com/",
@@ -205,6 +210,9 @@ func TestWebSettingsDefaultAndPersist(t *testing.T) {
 	if got.AutoCheckUpdate {
 		t.Fatalf("custom save should keep AutoCheckUpdate false when omitted: %#v", got)
 	}
+	if got.AutoSwitchInvalidSources {
+		t.Fatalf("custom save should keep AutoSwitchInvalidSources false when omitted: %#v", got)
+	}
 	if got.UpdateRepoURL != DefaultUpdateRepoURL {
 		t.Fatalf("custom save should fallback UpdateRepoURL to default: got %q want %q", got.UpdateRepoURL, DefaultUpdateRepoURL)
 	}
@@ -228,6 +236,34 @@ func TestWebSettingsDefaultAndPersist(t *testing.T) {
 	got = GetWebSettings()
 	if got.DownloadDir != filepath.Clean(absoluteDir) {
 		t.Fatalf("absolute download dir mismatch: got %q want %q", got.DownloadDir, filepath.Clean(absoluteDir))
+	}
+}
+
+func TestWebSettingsLegacyPayloadDefaultsAutoSwitchInvalidSources(t *testing.T) {
+	baseDir := t.TempDir()
+	t.Setenv("MUSIC_DL_CONFIG_DB", filepath.Join(baseDir, "data", "settings.db"))
+	t.Setenv("MUSIC_DL_COOKIE_FILE", filepath.Join(baseDir, "data", "cookies.json"))
+	resetConfigStateForTest()
+	t.Cleanup(resetConfigStateForTest)
+
+	legacySettings := map[string]any{
+		"downloadDir":     DefaultWebDownloadDir,
+		"autoCheckUpdate": true,
+	}
+	data, err := json.Marshal(legacySettings)
+	if err != nil {
+		t.Fatalf("marshal legacy settings: %v", err)
+	}
+	if err := ensureConfigDB(); err != nil {
+		t.Fatalf("ensure config db: %v", err)
+	}
+	if err := configDB.Save(&configKV{Key: webSettingsKey, Value: string(data)}).Error; err != nil {
+		t.Fatalf("save legacy settings: %v", err)
+	}
+
+	got := GetWebSettings()
+	if !got.AutoSwitchInvalidSources {
+		t.Fatalf("legacy settings should default AutoSwitchInvalidSources to true: %#v", got)
 	}
 }
 

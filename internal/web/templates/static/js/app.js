@@ -3,6 +3,7 @@
 const API_ROOT = window.API_ROOT;
 const WEB_SETTINGS_KEY = 'musicdl:web_settings';
 const INSPECT_REQUEST_DELAY_MS = 100;
+const AUTO_SWITCH_INVALID_DELAY_MS = 500;
 const DEFAULT_WEB_PAGE_SIZE = 50;
 const DEFAULT_CLI_PAGE_SIZE = 20;
 const LOCAL_MUSIC_SOURCE = 'local';
@@ -41,6 +42,7 @@ let webSettings = {
     webPageSize: DEFAULT_WEB_PAGE_SIZE,
     cliPageSize: DEFAULT_CLI_PAGE_SIZE,
     autoCheckUpdate: true,
+    autoSwitchInvalidSources: true,
     updateRepoUrl: DEFAULT_UPDATE_REPO_URL,
     githubProxyEnabled: false,
     githubProxyUrl: DEFAULT_GITHUB_PROXY_URL,
@@ -60,6 +62,7 @@ function normalizeWebSettings(raw) {
         webPageSize: DEFAULT_WEB_PAGE_SIZE,
         cliPageSize: DEFAULT_CLI_PAGE_SIZE,
         autoCheckUpdate: true,
+        autoSwitchInvalidSources: true,
         updateRepoUrl: DEFAULT_UPDATE_REPO_URL,
         githubProxyEnabled: false,
         githubProxyUrl: DEFAULT_GITHUB_PROXY_URL,
@@ -93,6 +96,9 @@ function normalizeWebSettings(raw) {
     }
     if (typeof raw.autoCheckUpdate === 'boolean') {
         next.autoCheckUpdate = raw.autoCheckUpdate;
+    }
+    if (typeof raw.autoSwitchInvalidSources === 'boolean') {
+        next.autoSwitchInvalidSources = raw.autoSwitchInvalidSources;
     }
     if (typeof raw.updateRepoUrl === 'string' && raw.updateRepoUrl.trim() !== '') {
         next.updateRepoUrl = raw.updateRepoUrl.trim();
@@ -216,6 +222,7 @@ function bindDownloadDirPresetEvents() {
 }
 
 function applyWebSettings(settings) {
+    const wasAutoSwitchInvalidSourcesEnabled = isAutoSwitchInvalidSourcesEnabled();
     webSettings = normalizeWebSettings(settings);
     persistWebSettingsCache();
 
@@ -252,6 +259,11 @@ function applyWebSettings(settings) {
         cliPageSizeInput.value = String(webSettings.cliPageSize || DEFAULT_CLI_PAGE_SIZE);
     }
 
+    const autoSwitchInvalidSourcesToggle = document.getElementById('setting-auto-switch-invalid-sources');
+    if (autoSwitchInvalidSourcesToggle) {
+        autoSwitchInvalidSourcesToggle.checked = webSettings.autoSwitchInvalidSources;
+    }
+
 
     const vgChangeCoverToggle = document.getElementById('setting-vg-change-cover');
     if (vgChangeCoverToggle) {
@@ -276,6 +288,14 @@ function applyWebSettings(settings) {
     applyVideoGenFeatureVisibility();
     syncFloatingLyricsSetting();
     refreshDownloadLinks();
+    if (webSettings.autoSwitchInvalidSources) {
+        if (!wasAutoSwitchInvalidSourcesEnabled) {
+            autoSwitchInvalidLastKey = '';
+        }
+        scheduleAutoSwitchInvalidSources(0);
+    } else {
+        clearAutoSwitchInvalidTimer();
+    }
 }
 
 async function fetchWebSettings() {
@@ -805,6 +825,7 @@ function bindSongCardCovers(root = document) {
 }
 
 function initializePageContent(root = document) {
+    resetAutoSwitchInvalidState();
     bindSourceSelectorButtons(root);
     initSourceSelectorCollapse(root);
     bindSearchForm(root);
@@ -1677,10 +1698,18 @@ function inspectSong(card) {
         .catch(() => {
             const el = document.getElementById(`size-${id}`);
             if (el) el.textContent = '检测失败';
+        })
+        .finally(() => {
+            delete card.dataset.inspectPending;
+            if (document.querySelector('.tag-fail')) {
+                scheduleAutoSwitchInvalidSources();
+            }
         });
 }
 
 function queueInspectSong(card, delay = INSPECT_REQUEST_DELAY_MS) {
+    if (!card) return;
+    card.dataset.inspectPending = '1';
     window.setTimeout(() => inspectSong(card), delay);
 }
 
@@ -2559,6 +2588,7 @@ async function saveCookies() {
         webPageSize: parsePositiveInt(webPageSizeInput?.value, DEFAULT_WEB_PAGE_SIZE),
         cliPageSize: parsePositiveInt(cliPageSizeInput?.value, DEFAULT_CLI_PAGE_SIZE),
         autoCheckUpdate: webSettings.autoCheckUpdate,
+        autoSwitchInvalidSources: !!document.getElementById('setting-auto-switch-invalid-sources')?.checked,
         updateRepoUrl: webSettings.updateRepoUrl || DEFAULT_UPDATE_REPO_URL,
         githubProxyEnabled: !!webSettings.githubProxyEnabled,
         githubProxyUrl: webSettings.githubProxyUrl || DEFAULT_GITHUB_PROXY_URL,
@@ -3818,7 +3848,7 @@ function syncSongToAPlayer(oldId, newSong) {
     }
 }
 
-function switchSource(btn) {
+function switchSource(btn, options = {}) {
     const card = btn.closest('.song-card');
     if (!card) return Promise.resolve(false);
 
@@ -3837,10 +3867,13 @@ function switchSource(btn) {
         .then(r => r.ok ? r.json() : Promise.reject())
         .then(song => {
             updateCardWithSong(card, song);
+            clearSongCardSelection(card, { deferToolbar: !!options.deferToolbar });
             return true;
         })
         .catch(() => {
-            alert('换源失败，请稍后重试');
+            if (!options.silent) {
+                alert('换源失败，请稍后重试');
+            }
             return false;
         })
         .finally(() => {
@@ -3917,6 +3950,162 @@ window.playAllAndJumpToId = function(songId) {
 };
 
 let isBatchMode = false;
+let autoSwitchInvalidTimer = 0;
+let autoSwitchInvalidInProgress = false;
+let autoSwitchInvalidPending = false;
+let autoSwitchInvalidLastKey = '';
+
+function clearAutoSwitchInvalidTimer() {
+    if (autoSwitchInvalidTimer) {
+        window.clearTimeout(autoSwitchInvalidTimer);
+        autoSwitchInvalidTimer = 0;
+    }
+    autoSwitchInvalidPending = false;
+}
+
+function resetAutoSwitchInvalidState() {
+    clearAutoSwitchInvalidTimer();
+    autoSwitchInvalidInProgress = false;
+    autoSwitchInvalidLastKey = '';
+}
+
+function isAutoSwitchInvalidSourcesEnabled() {
+    return webSettings.autoSwitchInvalidSources !== false;
+}
+
+function hasPendingSongInspections() {
+    return !!document.querySelector('.song-card[data-inspect-pending="1"]');
+}
+
+function getInvalidSongCards(root = document) {
+    const seen = new Set();
+    const cards = [];
+    root.querySelectorAll('.tag-fail').forEach(tag => {
+        const card = tag.closest('.song-card');
+        if (!card || seen.has(card) || isLocalMusicSourceValue(card.dataset.source)) return;
+        if (card.dataset.autoSwitchInvalidAttempted === '1' && root === document) return;
+        seen.add(card);
+        cards.push(card);
+    });
+    return cards;
+}
+
+function getManualInvalidSongCards(root = document) {
+    const seen = new Set();
+    const cards = [];
+    root.querySelectorAll('.tag-fail').forEach(tag => {
+        const card = tag.closest('.song-card');
+        if (!card || seen.has(card) || isLocalMusicSourceValue(card.dataset.source)) return;
+        seen.add(card);
+        cards.push(card);
+    });
+    return cards;
+}
+
+function invalidSongCardsKey(cards) {
+    return cards
+        .map(card => `${card.dataset.source || ''}:${card.dataset.id || ''}`)
+        .sort()
+        .join('|');
+}
+
+function clearSongCardSelection(card, options = {}) {
+    if (!card) return false;
+    const cb = card.querySelector('.song-checkbox');
+    if (!cb || !cb.checked) return false;
+    cb.checked = false;
+    card.classList.remove('selected');
+    if (!options.deferToolbar) {
+        updateBatchToolbar();
+    }
+    return true;
+}
+
+function selectInvalidSongCards(options = {}) {
+    const invalidCards = Array.isArray(options.cards) ? options.cards : getManualInvalidSongCards();
+    if (invalidCards.length === 0) {
+        if (!options.silent) {
+            alert('当前列表中没有检测到无效歌曲');
+        }
+        return 0;
+    }
+
+    let changed = 0;
+    const invalidSet = new Set(invalidCards);
+    document.querySelectorAll('.song-checkbox').forEach(checkbox => {
+        const card = checkbox.closest('.song-card');
+        const shouldCheck = invalidSet.has(card);
+        if (!shouldCheck && options.clearExisting !== false) {
+            if (checkbox.checked) {
+                checkbox.checked = false;
+                changed++;
+            }
+            return;
+        }
+        if (!shouldCheck) return;
+        if (!checkbox.checked) {
+            checkbox.checked = true;
+            changed++;
+        }
+    });
+
+    updateBatchToolbar();
+    if (!options.silent && changed === 0) {
+        alert('无效歌曲已全部选中');
+    }
+    return invalidCards.length;
+}
+
+function scheduleAutoSwitchInvalidSources(delay = AUTO_SWITCH_INVALID_DELAY_MS) {
+    if (!isAutoSwitchInvalidSourcesEnabled()) return;
+    if (autoSwitchInvalidInProgress) {
+        autoSwitchInvalidPending = true;
+        return;
+    }
+    if (autoSwitchInvalidTimer) {
+        window.clearTimeout(autoSwitchInvalidTimer);
+    }
+    autoSwitchInvalidTimer = window.setTimeout(() => {
+        autoSwitchInvalidTimer = 0;
+        autoSwitchInvalidSources();
+    }, Math.max(0, delay));
+}
+
+async function autoSwitchInvalidSources() {
+    if (!isAutoSwitchInvalidSourcesEnabled()) return false;
+    if (autoSwitchInvalidInProgress) {
+        autoSwitchInvalidPending = true;
+        return false;
+    }
+    if (hasPendingSongInspections()) {
+        scheduleAutoSwitchInvalidSources(AUTO_SWITCH_INVALID_DELAY_MS);
+        return false;
+    }
+
+    const invalidCards = getInvalidSongCards();
+    if (invalidCards.length === 0) return false;
+
+    const key = invalidSongCardsKey(invalidCards);
+    if (key && key === autoSwitchInvalidLastKey) return false;
+    autoSwitchInvalidLastKey = key;
+    invalidCards.forEach(card => {
+        card.dataset.autoSwitchInvalidAttempted = '1';
+    });
+
+    selectInvalidSongCards({ silent: true, cards: invalidCards });
+    autoSwitchInvalidInProgress = true;
+    showToast('自动换源', `检测到 ${invalidCards.length} 首无效歌曲，正在批量换源`, 'info', 3500);
+    try {
+        await batchSwitchSource({ skipConfirm: true, silent: true, auto: true, cards: invalidCards });
+        return true;
+    } finally {
+        autoSwitchInvalidInProgress = false;
+        if (autoSwitchInvalidPending) {
+            autoSwitchInvalidPending = false;
+            scheduleAutoSwitchInvalidSources();
+        }
+    }
+}
 
 function toggleBatchMode() {
     isBatchMode = !isBatchMode;
@@ -3986,28 +4175,7 @@ function toggleSelectAll(mainCb) {
 }
 
 function selectInvalidSongs() {
-    const invalidTags = document.querySelectorAll('.tag-fail');
-    if (invalidTags.length === 0) {
-        alert('当前列表中没有检测到无效歌曲');
-        return;
-    }
-    
-    let count = 0;
-    invalidTags.forEach(tag => {
-        const card = tag.closest('.song-card');
-        if (card) {
-            const cb = card.querySelector('.song-checkbox');
-            if (cb && !cb.checked) {
-                cb.checked = true;
-                count++;
-            }
-        }
-    });
-    
-    if (count === 0) {
-        alert('无效歌曲已全部选中');
-    }
-    updateBatchToolbar();
+    selectInvalidSongCards();
 }
 
 function getSelectedSongs() {
@@ -4219,22 +4387,35 @@ async function batchDeleteLocalMusic() {
     }
 }
 
-function batchSwitchSource() {
-    const checkedBoxes = Array.from(document.querySelectorAll('.song-checkbox:checked'));
-    if (checkedBoxes.length === 0) return;
+async function batchSwitchSource(options = {}) {
+    const optionCards = Array.isArray(options.cards)
+        ? options.cards.filter(card => card && card.isConnected)
+        : null;
+    const checkedBoxes = optionCards
+        ? optionCards.map(card => card.querySelector('.song-checkbox')).filter(Boolean)
+        : Array.from(document.querySelectorAll('.song-checkbox:checked'));
+    if (checkedBoxes.length === 0) return false;
 
-    const cards = checkedBoxes
-        .map(cb => cb.closest('.song-card'))
-        .filter(card => card && !isLocalMusicSourceValue(card.dataset.source));
-    const skippedLocalCount = checkedBoxes.length - cards.length;
+    const candidateCards = optionCards || checkedBoxes.map(cb => cb.closest('.song-card'));
+    const cards = candidateCards.filter(card => card && !isLocalMusicSourceValue(card.dataset.source));
+    const skippedLocalCount = candidateCards.length - cards.length;
     if (cards.length === 0) {
-        alert('选中的歌曲都是本地歌曲，无需批量换源。');
-        return;
+        if (!options.silent) {
+            alert('选中的歌曲都是本地歌曲，无需批量换源。');
+        }
+        return false;
     }
 
     const skipText = skippedLocalCount > 0 ? `\n已跳过 ${skippedLocalCount} 首本地歌曲。` : '';
-    if (!confirm(`准备对 ${cards.length} 首歌曲进行自动换源。\n这可能需要一些时间，请耐心等待。${skipText}`)) {
-        return;
+    if (!options.skipConfirm && !confirm(`准备对 ${cards.length} 首歌曲进行自动换源。\n这可能需要一些时间，请耐心等待。${skipText}`)) {
+        return false;
+    }
+
+    const batchSwitch = document.getElementById('btn-batch-switch');
+    const originalHTML = batchSwitch ? batchSwitch.innerHTML : '';
+    if (batchSwitch) {
+        batchSwitch.disabled = true;
+        batchSwitch.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 换源中';
     }
 
     const concurrency = Math.min(3, cards.length);
@@ -4244,11 +4425,19 @@ function batchSwitchSource() {
             const card = cards[nextIndex++];
             const switchBtn = card.querySelector('.btn-switch');
             if (switchBtn) {
-                await switchSource(switchBtn);
+                await switchSource(switchBtn, { silent: !!options.silent, deferToolbar: true });
             }
         }
     };
-    Promise.all(Array.from({ length: concurrency }, runWorker));
+    try {
+        await Promise.all(Array.from({ length: concurrency }, runWorker));
+        return true;
+    } finally {
+        if (batchSwitch) {
+            batchSwitch.innerHTML = originalHTML;
+        }
+        updateBatchToolbar();
+    }
 }
 
 async function batchRemoveFromCollection(colId) {
