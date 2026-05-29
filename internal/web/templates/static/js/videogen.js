@@ -211,40 +211,40 @@
 
             try {
                 let initRes;
-                // 新增：如果前端传来了自定义的音乐 Blob 文件，走 FormData 上传逻辑
+                let audioBuffer;
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
                 if (data.customAudioFile) {
                     setStatus("正在初始化...", "正在向服务器投递您的本地音乐...", 5);
                     const fd = new FormData();
                     fd.append("id", data.id);
                     fd.append("source", data.source);
                     fd.append("audio_file", data.customAudioFile);
-                    
+
                     initRes = await fetch(`${apiRoot}/videogen/init`, {
                         method: "POST",
                         body: fd
                     }).then(r => r.json());
-                } else {
-                    // 原版逻辑：仅传 ID 让服务器自己下
-                    setStatus("正在初始化...", "请求云端处理通道", 5);
-                    initRes = await fetch(`${apiRoot}/videogen/init`, {
-                        method: "POST", headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ id: data.id, source: data.source }),
-                    }).then((r) => r.json());
-                }
-                
-                if (initRes.error) throw new Error(initRes.error);
-                
-                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                let audioBuffer;
+                    if (initRes.error) throw new Error(initRes.error);
 
-                if (data.customAudioFile) {
                     setStatus("解码音频...", "解析本地高清音频数据...", 15);
                     const arr = await data.customAudioFile.arrayBuffer();
                     audioBuffer = await audioCtx.decodeAudioData(arr);
                 } else {
-                    setStatus("下载与解码音频...", "可能需要一些时间，请耐心等待", 15);
-                    const arr = await fetch(initRes.audio_url).then((r) => r.arrayBuffer());
-                    audioBuffer = await audioCtx.decodeAudioData(arr);
+                    setStatus("正在初始化...", "下载音频与初始化并行中...", 5);
+                    const audioDownloadUrl = `${apiRoot}/download?id=${encodeURIComponent(data.id)}&source=${encodeURIComponent(data.source)}`;
+                    const [initResult, audioArr] = await Promise.all([
+                        fetch(`${apiRoot}/videogen/init`, {
+                            method: "POST", headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ id: data.id, source: data.source }),
+                        }).then(r => r.json()),
+                        fetch(audioDownloadUrl).then(r => r.arrayBuffer())
+                    ]);
+                    initRes = initResult;
+                    if (initRes.error) throw new Error(initRes.error);
+
+                    setStatus("解码音频...", "解析音频数据...", 15);
+                    audioBuffer = await audioCtx.decodeAudioData(audioArr);
                 }
                     
                 setStatus("加载视觉资源...", "准备 1080P 超清渲染画板", 25);
@@ -677,19 +677,27 @@
                 };
                 
                 let frameIdx = 0;
+                let uploadPromise = Promise.resolve();
+                const renderStartTime = performance.now();
                 while (frameIdx < totalFrames) {
                   let framesBuffer = [];
                   const batchStartIdx = frameIdx;
                   for (let i = 0; i < batchSize && frameIdx < totalFrames; i++) {
                     await drawFrame(frameIdx);
-                    framesBuffer.push(canvas.toDataURL("image/jpeg", 0.95));
+                    framesBuffer.push(canvas.toDataURL("image/jpeg", 0.92));
                     frameIdx++;
                   }
-                  await uploadBatch(framesBuffer, batchStartIdx);
+                  await uploadPromise;
+                  uploadPromise = uploadBatch(framesBuffer, batchStartIdx);
                   const pct = Math.round((frameIdx / totalFrames) * 100);
-                  setStatus("超清帧渲染中...", `已完成 ${pct}%  (${frameIdx}/${totalFrames} 帧)`, 30 + pct * 0.65);
-                  await new Promise(r => setTimeout(r, 0));
+                  const elapsed = (performance.now() - renderStartTime) / 1000;
+                  const eta = frameIdx > 0 ? Math.round(elapsed / frameIdx * (totalFrames - frameIdx)) : 0;
+                  const etaMin = Math.floor(eta / 60);
+                  const etaSec = eta % 60;
+                  const etaStr = etaMin > 0 ? `${etaMin}分${etaSec}秒` : `${etaSec}秒`;
+                  setStatus("超清帧渲染中...", `已完成 ${pct}%  (${frameIdx}/${totalFrames} 帧)  预计剩余 ${etaStr}`, 30 + pct * 0.65);
                 }
+                await uploadPromise;
                 
                 setStatus("正在合成最终视频...", "合并无损音频与画面帧", 98);
                 const finalRes = await fetch(`${apiRoot}/videogen/finish`, {
