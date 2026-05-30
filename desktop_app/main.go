@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"strings"
 
 	"gioui.org/app"
 	"gioui.org/f32"
@@ -17,6 +18,7 @@ import (
 	"github.com/guohuiyuan/go-music-dl/internal/web"
 
 	_ "gioui.org/app/permission/storage"
+	_ "gioui.org/app/permission/wakelock"
 )
 
 type webTag struct{}
@@ -39,6 +41,7 @@ type desktopApp struct {
 const (
 	initialURL         = "http://localhost:37777/music/"
 	downloadCallback   = "musicDlOpenDownload"
+	playbackCallback   = "musicDlPlaybackState"
 	preferredBrowserPK = ""
 )
 
@@ -65,6 +68,34 @@ const bridgeScript = `(function () {
     }
   }, true);
 
+  function notifyPlaybackState(state) {
+    if (globalThis.callback && typeof globalThis.callback.musicDlPlaybackState === "function") {
+      globalThis.callback.musicDlPlaybackState("playback:" + state);
+    }
+  }
+
+  document.addEventListener("play", function (event) {
+    if (event.target && event.target.tagName === "AUDIO") {
+      notifyPlaybackState("playing");
+    }
+  }, true);
+
+  document.addEventListener("pause", function (event) {
+    if (event.target && event.target.tagName === "AUDIO") {
+      notifyPlaybackState("paused");
+    }
+  }, true);
+
+  document.addEventListener("ended", function (event) {
+    if (event.target && event.target.tagName === "AUDIO") {
+      notifyPlaybackState("ended");
+    }
+  }, true);
+
+  window.addEventListener("pagehide", function () {
+    notifyPlaybackState("released");
+  });
+
   document.addEventListener("click", function (event) {
     if (event.defaultPrevented) {
       return;
@@ -73,18 +104,12 @@ const bridgeScript = `(function () {
       return;
     }
 
-    var link = event.target && event.target.closest ? event.target.closest(".btn-download") : null;
+    var link = event.target && event.target.closest ? event.target.closest(".btn-download, .btn-browser-download") : null;
     if (!link) {
       return;
     }
 
-    var localToggle = document.getElementById("setting-download-to-local");
-    if (localToggle && localToggle.checked) {
-      return;
-    }
-
-    var embedToggle = document.getElementById("setting-embed-download");
-    if (embedToggle && embedToggle.checked) {
+    if (link.classList.contains("btn-download")) {
       return;
     }
 
@@ -92,6 +117,11 @@ const bridgeScript = `(function () {
     if (!href) {
       return;
     }
+    try {
+      var url = new URL(href, window.location.href);
+      url.searchParams.delete("save_local");
+      href = url.toString();
+    } catch (_) {}
 
     event.preventDefault();
     event.stopPropagation();
@@ -137,6 +167,7 @@ func (a *desktopApp) run() error {
 	for {
 		switch evt := gioplugins.Hijack(a.window).(type) {
 		case app.DestroyEvent:
+			a.setPlaybackWakeLock(false)
 			return evt.Err
 		case app.ViewEvent:
 			a.requestStoragePermission(evt)
@@ -183,6 +214,11 @@ func (a *desktopApp) ensureBridge(gtx layout.Context) {
 			View: &a.tag,
 			Tag:  &a.tag,
 			Name: downloadCallback,
+		})
+		gioplugins.Execute(gtx, giowebview.MessageReceiverCmd{
+			View: &a.tag,
+			Tag:  &a.tag,
+			Name: playbackCallback,
 		})
 		a.callbackRegistered = true
 		a.pendingInitialNav = true
@@ -246,6 +282,11 @@ func (a *desktopApp) consumeWebViewEvents(gtx layout.Context) {
 }
 
 func (a *desktopApp) handleWebViewMessage(raw string) {
+	if strings.HasPrefix(raw, "playback:") {
+		a.handlePlaybackState(strings.TrimPrefix(raw, "playback:"))
+		return
+	}
+
 	u, err := url.Parse(raw)
 	if err != nil {
 		log.Printf("invalid download url from webview: %q (%v)", raw, err)
@@ -254,6 +295,15 @@ func (a *desktopApp) handleWebViewMessage(raw string) {
 
 	a.pendingExternalOpenTo = u
 	log.Printf("received download url from webview: %s", u.String())
+}
+
+func (a *desktopApp) handlePlaybackState(state string) {
+	switch strings.TrimSpace(state) {
+	case "playing":
+		a.setPlaybackWakeLock(true)
+	case "paused", "ended", "released":
+		a.setPlaybackWakeLock(false)
+	}
 }
 
 func consumeBackShortcuts(gtx layout.Context) bool {

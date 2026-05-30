@@ -4,6 +4,7 @@ package main
 
 import (
 	"log"
+	"sync"
 
 	"gioui.org/app"
 	"git.wow.st/gmp/jni"
@@ -16,6 +17,11 @@ const (
 
 	readExternalStorage  = "android.permission.READ_EXTERNAL_STORAGE"
 	writeExternalStorage = "android.permission.WRITE_EXTERNAL_STORAGE"
+)
+
+var (
+	playbackWakeLockMu sync.Mutex
+	playbackWakeLock   jni.Object
 )
 
 func (a *desktopApp) requestStoragePermission(evt app.ViewEvent) {
@@ -32,6 +38,9 @@ func (a *desktopApp) requestStoragePermission(evt app.ViewEvent) {
 	go a.window.Run(func() {
 		if err := requestStoragePermissionFromView(view); err != nil {
 			log.Printf("request storage permission: %v", err)
+		}
+		if err := initPlaybackWakeLockFromView(view); err != nil {
+			log.Printf("init playback wake lock: %v", err)
 		}
 	})
 }
@@ -141,4 +150,79 @@ func startActivity(env jni.Env, activity, intent jni.Object) error {
 		jni.GetMethodID(env, activityClass, "startActivity", "(Landroid/content/Intent;)V"),
 		jni.Value(intent),
 	)
+}
+
+func initPlaybackWakeLockFromView(view jni.Object) error {
+	return jni.Do(jni.JVMFor(app.JavaVM()), func(env jni.Env) error {
+		activity, err := activityFromView(env, view)
+		if err != nil {
+			return err
+		}
+
+		contextClass := jni.FindClass(env, "android/content/Context")
+		powerService := jni.GetStaticObjectField(env, contextClass, jni.GetStaticFieldID(env, contextClass, "POWER_SERVICE", "Ljava/lang/String;"))
+		powerManager, err := jni.CallObjectMethod(
+			env,
+			activity,
+			jni.GetMethodID(env, jni.GetObjectClass(env, activity), "getSystemService", "(Ljava/lang/String;)Ljava/lang/Object;"),
+			jni.Value(powerService),
+		)
+		if err != nil {
+			return err
+		}
+
+		powerManagerClass := jni.FindClass(env, "android/os/PowerManager")
+		partialWakeLock := jni.GetStaticIntField(env, powerManagerClass, jni.GetStaticFieldID(env, powerManagerClass, "PARTIAL_WAKE_LOCK", "I"))
+		wakeLock, err := jni.CallObjectMethod(
+			env,
+			powerManager,
+			jni.GetMethodID(env, powerManagerClass, "newWakeLock", "(ILjava/lang/String;)Landroid/os/PowerManager$WakeLock;"),
+			jni.Value(partialWakeLock),
+			jni.Value(jni.JavaString(env, "music-dl:playback")),
+		)
+		if err != nil {
+			return err
+		}
+
+		globalWakeLock := jni.NewGlobalRef(env, wakeLock)
+		playbackWakeLockMu.Lock()
+		if playbackWakeLock != 0 {
+			jni.DeleteGlobalRef(env, playbackWakeLock)
+		}
+		playbackWakeLock = globalWakeLock
+		playbackWakeLockMu.Unlock()
+		return nil
+	})
+}
+
+func (a *desktopApp) setPlaybackWakeLock(hold bool) {
+	a.window.Run(func() {
+		if err := setPlaybackWakeLockHeld(hold); err != nil {
+			log.Printf("set playback wake lock %v: %v", hold, err)
+		}
+	})
+}
+
+func setPlaybackWakeLockHeld(hold bool) error {
+	return jni.Do(jni.JVMFor(app.JavaVM()), func(env jni.Env) error {
+		playbackWakeLockMu.Lock()
+		wakeLock := playbackWakeLock
+		playbackWakeLockMu.Unlock()
+		if wakeLock == 0 {
+			return nil
+		}
+
+		wakeLockClass := jni.GetObjectClass(env, wakeLock)
+		held, err := jni.CallBooleanMethod(env, wakeLock, jni.GetMethodID(env, wakeLockClass, "isHeld", "()Z"))
+		if err != nil {
+			return err
+		}
+		if hold == held {
+			return nil
+		}
+		if hold {
+			return jni.CallVoidMethod(env, wakeLock, jni.GetMethodID(env, wakeLockClass, "acquire", "()V"))
+		}
+		return jni.CallVoidMethod(env, wakeLock, jni.GetMethodID(env, wakeLockClass, "release", "()V"))
+	})
 }
