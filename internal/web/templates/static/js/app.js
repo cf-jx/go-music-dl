@@ -731,7 +731,6 @@ function applySourceSelectorCollapsed(selector, collapsed) {
 function toggleSourceSelector(force) {
     const selector = document.getElementById('source-selector');
     if (!selector) return;
-    if (!isMobileSourceSelectorViewport()) return;
     const collapsed = typeof force === 'boolean'
         ? force
         : !selector.classList.contains('is-collapsed');
@@ -760,9 +759,6 @@ function initSourceSelectorCollapse(root = document) {
     }
     if (typeof collapsed !== 'boolean') {
         collapsed = isMobile;
-    }
-    if (!isMobile) {
-        collapsed = false;
     }
     applySourceSelectorCollapsed(selector, collapsed);
 }

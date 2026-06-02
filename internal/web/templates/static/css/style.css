@@ -91,9 +91,11 @@ input[type="password"]:focus { border-color: #10b981; background: #fff; box-shad
 
 .source-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #edf2f7; gap: 12px; }
 .source-title { font-weight: 700; color: var(--text-sub); font-size: 0.9rem; }
-.source-collapse-btn { background: none; border: none; padding: 0; display: inline-flex; align-items: center; gap: 6px; cursor: default; color: inherit; font: inherit; }
+.source-collapse-btn { background: none; border: none; padding: 0; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: inherit; font: inherit; }
 .source-collapse-btn:focus { outline: none; }
-.source-collapse-icon { color: var(--text-sub); font-size: 11px; transition: transform 0.2s ease; display: none; }
+.source-collapse-btn:hover .source-title,
+.source-collapse-btn:hover .source-collapse-icon { color: #10b981; }
+.source-collapse-icon { color: var(--text-sub); font-size: 11px; transition: transform 0.2s ease; display: inline-block; }
 .source-actions { display: flex; gap: 4px; flex-shrink: 0; }
 .ctrl-btn { background: none; border: none; color: var(--text-sub); font-size: 12px; cursor: pointer; padding: 4px 8px; border-radius: 6px; transition: all 0.2s; }
 .ctrl-btn:hover { background: #edf2f7; color: #10b981; }
@@ -109,12 +111,6 @@ input[type="password"]:focus { border-color: #10b981; background: #fff; box-shad
 .source-selector.is-collapsed .source-grid { display: none; }
 .source-selector.is-collapsed .source-collapse-icon { transform: rotate(180deg); }
 .source-selector.is-collapsed .source-header { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
-@media (max-width: 720px) {
-    .source-collapse-btn { cursor: pointer; }
-    .source-collapse-btn:hover .source-title,
-    .source-collapse-btn:hover .source-collapse-icon { color: #10b981; }
-    .source-collapse-icon { display: inline-block; }
-}
 .source-checkbox { display: none; }
 .source-card {
     background: #fff; border: 2px solid #e2e8f0; border-radius: 12px; padding: 10px 8px;
