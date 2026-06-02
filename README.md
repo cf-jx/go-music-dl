@@ -18,7 +18,7 @@ Go Music DL 是一个音乐搜索与下载工具，支持 **Web 界面**、**TUI
 2. 解压，双击运行
 3. 享受原生桌面体验！
 
-移动端下载说明：在 [Releases](https://github.com/guohuiyuan/go-music-dl/releases) 页面可直接下载 Android `music-dl_arm64-v8a.apk`（推荐）/ `music-dl_x86_64.apk` / `music-dl.apk`（无分片兼容包）。iOS 会提供 `music-dl-ios-unsigned.ipa` 给用户自行签名；如果发布环境配置了证书，也会额外提供已签名的 `music-dl-ios.ipa`。
+移动端下载说明：在 [Releases](https://github.com/guohuiyuan/go-music-dl/releases) 页面可直接下载 Android `music-dl_arm64-v8a.apk`（推荐）/ `music-dl_x86_64.apk` / `music-dl.apk`（无分片兼容包）。Android APK 已内置 `ffmpeg` 与 `ffprobe`，本地音乐探测、非 MP3 元数据内嵌和视频渲染无需在手机上额外安装 FFmpeg。iOS 会提供 `music-dl-ios-unsigned.ipa` 给用户自行签名；如果发布环境配置了证书，也会额外提供已签名的 `music-dl-ios.ipa`。
 
 ### Web 模式
 
@@ -149,7 +149,8 @@ ffmpeg -version
 `ffprobe` 属于 FFmpeg 工具集，主要用于本地音乐的时长、码率和标签探测；`ffmpeg` 主要用于非 MP3 音频的封面/歌词元数据写入。缺少它们不会影响程序启动，也不会阻塞本地音乐列表加载，只会降级相关增强能力。
 
 * **Docker 镜像**: `Dockerfile` 已安装 Alpine 的 `ffmpeg` 包，并在构建时校验 `ffmpeg` 与 `ffprobe` 都可用；Docker / Compose 部署通常无需额外安装。
-* **GitHub Release 的 CLI / 桌面 / 移动端包**: `release.yml` 产物默认不内置 `ffmpeg/ffprobe`，也不要求 CI 打包机安装它们；如果需要本地音乐探测或非 MP3 元数据内嵌，请在运行机器上按上面的命令自行安装 FFmpeg。
+* **GitHub Release 的 Android APK**: `release.yml` 会在 APK 构建后下载 Android `arm` / `arm64` / `x86` / `x86_64` 的 `ffmpeg` 与 `ffprobe`，注入到 APK 的 `lib/<abi>/libffmpeg.so` 和 `lib/<abi>/libffprobe.so`，再重新 `zipalign` 与签名。Android App 启动后会自动从 `nativeLibraryDir` 定位这些内置二进制。
+* **GitHub Release 的 CLI / 桌面 / iOS 包**: 仍不内置 `ffmpeg/ffprobe`，也不要求 CI 打包机安装它们；如果需要本地音乐探测或非 MP3 元数据内嵌，请在运行机器上按上面的命令自行安装 FFmpeg。
 * **Linux deb/rpm/AppImage**: 仍按外部系统工具处理，不强制声明硬依赖，避免在不同发行版上因为 FFmpeg 包源差异导致安装失败。
 
 ## 新增改动（简要）
@@ -160,6 +161,7 @@ ffmpeg -version
 * **新增 Cookie 扫码登录**：设置面板支持网易云、QQ、酷狗、Bilibili 扫码登录，成功后自动保存 Cookie；汽水音乐新版扫码登录因动态 `a_bogus` / `msToken` 风控签名暂未调通，入口已临时隐藏。
 * **新增本地音乐功能**：Web 端支持读取本地下载目录、上传音频、自动补全元信息、读取同名封面/歌词，并可添加到自制歌单。
 * **本地音乐性能优化**：本地音乐列表支持分页加载、扫描快照与元数据缓存，过期后后台异步刷新不阻塞请求；上传 / 删除会自动作废缓存，Android 端修复了 `READ_MEDIA_AUDIO` 权限申请以读取 `/sdcard/Music`。
+* **Android APK 内置 FFmpeg / ffprobe**：GitHub Actions 打包 Android APK 时会下载 4 个 ABI 的 `ffmpeg` / `ffprobe` 并注入 APK，App 启动时自动配置内置二进制路径。
 * **本地音乐封面修复**：本地音乐列表扫描会读取音频内嵌封面并返回 `/local_music/cover` 地址，修复只有同名图片封面可显示、内嵌封面在列表里为空的问题。
 * **Web 自动换源优化**：系统设置新增“自动选择无效音源并批量换源”开关，默认开启；音乐列表检测到无效音源后会自动选中并批量换源，已换源歌曲会取消选中，避免重复换源。
 * **逐字歌词增强**：Web 首页、歌曲详情页与视频渲染统一支持网易云 / QQ 音乐 / 酷狗的原文、译文、罗马音逐字歌词；其他渠道继续使用原文逐行歌词。
@@ -343,7 +345,10 @@ adb install -r music-dl.apk
 
 * 安装 Go、JDK 17、Android SDK
 * 安装 `platform-tools`、`platforms;android-33`、`build-tools;34.0.0`、`ndk;27.0.12077973`
+* 下载 Android `arm` / `arm64` / `x86` / `x86_64` 的 `ffmpeg` 与 `ffprobe`
 * 执行 `package_app.bat`
+* 构建 APK 后注入 `lib/<abi>/libffmpeg.so` 与 `lib/<abi>/libffprobe.so`，重新 `zipalign` 并用发布 keystore 签名
+* 校验三个 APK 都包含对应 ABI 的 `ffmpeg/ffprobe` 且签名有效
 * 上传 `music-dl_arm64-v8a.apk`、`music-dl_x86_64.apk`、`music-dl.apk` 到 Actions Artifacts 和 GitHub Release
 
 发布后可在 [Releases](https://github.com/guohuiyuan/go-music-dl/releases) 下载三个 APK，推荐优先使用 `music-dl_arm64-v8a.apk`；极个别设备若无法安装/运行，再下载 `music-dl.apk`（无分片兼容包）。
@@ -574,6 +579,7 @@ go-music-dl/
 │   ├── cookies.json       # Cookie 配置文件
 │   └── settings.db        # 统一 SQLite 数据库（设置 / Cookie / 自制歌单）
 ├── .github/workflows/     # GitHub Actions 工作流
+├── .github/scripts/       # GitHub Actions 辅助脚本（Android FFmpeg 下载、注入与校验）
 ├── screenshots/           # 截图资源
 ├── docker-compose.yml     # Docker 生产环境配置 (直接拉取镜像)
 ├── docker-compose.dev.yml # Docker 开发环境配置 (本地构建)
