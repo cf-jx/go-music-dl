@@ -50,6 +50,14 @@
                         </label>
                         <p class="setting-hint">音乐列表检测完成后，会自动选中当前列表全部无效歌曲并执行批量换源，默认开启。</p>
                     </div>
+                    <div class="cookie-item setting-item">
+                        <label class="setting-toggle" for="setting-theme-mode">
+                            <input type="checkbox" id="setting-theme-mode" onchange="ThemeManager.set(this.checked ? 'dark' : 'light')">
+                            <span class="setting-switch" aria-hidden="true"></span>
+                            <span class="setting-toggle-text">深色模式 (Dark Mode)</span>
+                        </label>
+                        <p class="setting-hint">开启深色外观或关闭使用浅色外观。默认跟随系统设置。</p>
+                    </div>
                 </div>
 
                 <!-- 账号设置 -->

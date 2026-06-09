@@ -84,7 +84,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-	:root {
+	:root:not([data-theme="light"]) {
 		--bg-window: #1e1e1e;
 		--bg-sidebar: rgba(28, 28, 30, 0.72);
 		--bg-content: #2c2c2e;
@@ -110,6 +110,31 @@
 	}
 }
 
+:root[data-theme="dark"] {
+	--bg-window: #1e1e1e;
+	--bg-sidebar: rgba(28, 28, 30, 0.72);
+	--bg-content: #2c2c2e;
+	--bg-hover: rgba(255, 255, 255, 0.06);
+	--bg-active: rgba(10, 132, 255, 0.12);
+	--bg-glass: rgba(30, 30, 30, 0.72);
+	--bg-modal: rgba(28, 28, 30, 0.98);
+	--bg-input: rgba(255, 255, 255, 0.08);
+	--bg-tag: rgba(255, 255, 255, 0.08);
+	--bg-player: rgba(28, 28, 30, 0.85);
+
+	--text-primary: #f5f5f7;
+	--text-secondary: #aeaeae;
+	--text-tertiary: #636366;
+	--text-inverse: #1d1d1f;
+
+	--border: rgba(255, 255, 255, 0.08);
+	--border-strong: rgba(255, 255, 255, 0.16);
+
+	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+	--shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+	--shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+
 /* 自定义滚动条样式 (macOS 风格) */
 ::-webkit-scrollbar {
 	width: 8px;
@@ -126,12 +151,18 @@
 	background: rgba(0, 0, 0, 0.25);
 }
 @media (prefers-color-scheme: dark) {
-	::-webkit-scrollbar-thumb {
+	:root:not([data-theme="light"]) ::-webkit-scrollbar-thumb {
 		background: rgba(255, 255, 255, 0.15);
 	}
-	::-webkit-scrollbar-thumb:hover {
+	:root:not([data-theme="light"]) ::-webkit-scrollbar-thumb:hover {
 		background: rgba(255, 255, 255, 0.25);
 	}
+}
+:root[data-theme="dark"] ::-webkit-scrollbar-thumb {
+	background: rgba(255, 255, 255, 0.15);
+}
+:root[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+	background: rgba(255, 255, 255, 0.25);
 }
 
 /* APlayer 适配暗色模式与系统样式 */
@@ -1198,21 +1229,43 @@ body.batch-mode .song-row {
 .modal-body input[type="text"],
 .modal-body input[type="password"],
 .modal-body input[type="number"],
-.modal-body select {
+.modal-body select,
+.modal-pref-content input[type="text"],
+.modal-pref-content input[type="number"],
+.modal-pref-content select {
 	width: 100%;
 	padding: 9px 12px;
 	border: 1px solid var(--border);
 	border-radius: var(--r-sm);
-	background: var(--bg-content);
+	background: var(--bg-input);
 	font-size: 14px;
 	color: var(--text-primary);
 	outline: none;
 	transition: all var(--ease);
 }
 .modal-body input:focus,
-.modal-body select:focus {
+.modal-body select:focus,
+.modal-pref-content input:focus,
+.modal-pref-content select:focus {
 	border-color: var(--accent);
 	box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.15);
+}
+.cookie-qr-btn {
+	background: var(--bg-input);
+	border: 1px solid var(--border);
+	border-radius: var(--r-sm);
+	color: var(--text-primary);
+	padding: 6px 12px;
+	font-size: 13px;
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	transition: all var(--ease);
+}
+.cookie-qr-btn:hover {
+	background: var(--bg-hover);
+	border-color: var(--border-strong);
 }
 .modal-body .form-group {
 	margin-bottom: 16px;

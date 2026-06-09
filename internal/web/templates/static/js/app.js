@@ -1041,6 +1041,7 @@ function bindPageNavigationEvents() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    ThemeManager.init();
     loadWebSettingsFromCache();
     applyWebSettings(webSettings);
     bindAuthFloat();
@@ -2566,6 +2567,10 @@ async function openSystemConfig() {
             const firstTab = modal.querySelector('.modal-pref-tab');
             if (firstTab) {
                 switchPrefTab('pref-general', firstTab);
+            }
+            const themeChk = document.getElementById('setting-theme-mode');
+            if (themeChk) {
+                themeChk.checked = ThemeManager.isDarkActive();
             }
         }
     } catch (error) {
@@ -5141,3 +5146,35 @@ function removeSongFromCollection(btn, colId, originalSongId, originalSource) {
             }
         });
 }
+
+const ThemeManager = {
+    init() {
+        const theme = localStorage.getItem('theme-mode') || 'auto';
+        this.apply(theme);
+    },
+    apply(theme) {
+        const root = document.documentElement;
+        if (theme === 'dark') {
+            root.setAttribute('data-theme', 'dark');
+        } else if (theme === 'light') {
+            root.setAttribute('data-theme', 'light');
+        } else {
+            root.removeAttribute('data-theme');
+        }
+        const chk = document.getElementById('setting-theme-mode');
+        if (chk) {
+            chk.checked = this.isDarkActive();
+        }
+    },
+    isDarkActive() {
+        const theme = localStorage.getItem('theme-mode') || 'auto';
+        if (theme === 'dark') return true;
+        if (theme === 'light') return false;
+        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    },
+    set(theme) {
+        localStorage.setItem('theme-mode', theme);
+        this.apply(theme);
+    }
+};
+window.ThemeManager = ThemeManager;
