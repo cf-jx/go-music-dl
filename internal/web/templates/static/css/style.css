@@ -450,7 +450,7 @@ textarea {
 	width: 40px;
 	height: 40px;
 	border-radius: var(--r-md);
-	background: var(--text-primary);
+	background: var(--accent);
 	color: white;
 	border: none;
 	font-size: 16px;
@@ -458,7 +458,7 @@ textarea {
 	transition: all var(--ease);
 }
 .search-submit-btn:hover {
-	background: #333;
+	background: var(--accent-hover);
 	transform: scale(1.04);
 }
 .search-submit-btn:active {
@@ -1926,6 +1926,21 @@ body.batch-mode .checkbox-wrapper {
 /* APlayer 悬浮播放器 */
 .aplayer.aplayer-fixed {
 	z-index: 9999 !important;
+}
+/* 隐藏 APlayer 重复/多余的底部悬浮控制条与小折叠按钮，只保留并重新定位浮动歌词 */
+.aplayer.aplayer-fixed .aplayer-body,
+.aplayer.aplayer-fixed .aplayer-miniswitcher,
+.aplayer.aplayer-fixed .aplayer-list {
+	display: none !important;
+}
+.aplayer.aplayer-fixed .aplayer-lrc {
+	bottom: calc(var(--player-h) + 12px) !important;
+	text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7) !important;
+}
+.aplayer.aplayer-fixed .aplayer-lrc p {
+	font-size: 14px !important;
+	font-weight: 600 !important;
+	color: #ffffff !important;
 }
 
 /* 隐藏旧版右上角浮动按钮 */

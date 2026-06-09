@@ -3421,6 +3421,27 @@ function syncPlayerBar(audio) {
         const i = playBtn.querySelector('i');
         if (i) { i.className = ap.audio.paused ? 'fa-solid fa-play' : 'fa-solid fa-pause'; }
     }
+    if (art) {
+        art.style.cursor = 'pointer';
+        art.title = '点击打开详情/生成视频';
+        art.onclick = () => {
+            const idx = ap.list.index;
+            if (idx === undefined || idx < 0) return;
+            const currentAudio = ap.list.audios[idx];
+            if (currentAudio && currentAudio.custom_id && window.VideoGen) {
+                window.VideoGen.open({
+                    id: currentAudio.custom_id,
+                    source: currentAudio.source || 'netease',
+                    name: currentAudio.name,
+                    artist: currentAudio.artist,
+                    album: currentAudio.album || '',
+                    cover: currentAudio.cover,
+                    duration: parseInt(currentAudio.duration) || 0,
+                    extra: currentAudio.extra || ''
+                });
+            }
+        };
+    }
 }
 
 ap.on('play', () => {
