@@ -1,74 +1,178 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="referrer" content="no-referrer">
-    <title>music-dl - 聚合搜索与解析</title>
-    <link rel="icon" href="{{.Root}}/icon.png" type="image/png">
-    
-    <link rel="stylesheet" href="{{.Root}}/style.css">
-    <link rel="stylesheet" href="{{.Root}}/videogen.css">
-    
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/aplayer/dist/APlayer.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/css/all.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sakana-widget@2.7.1/lib/sakana.min.css"/>
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <meta name="referrer" content="no-referrer" />
+    <title>Music &mdash; 聚合搜索</title>
+    <link rel="icon" href="{{.Root}}/icon.png" type="image/png" />
+    <link rel="stylesheet" href="{{.Root}}/style.css" />
+    <link rel="stylesheet" href="{{.Root}}/videogen.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/aplayer/dist/APlayer.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/css/all.min.css"
+    />
+  </head>
+  <body>
+    <!-- ═══════════ 设置按钮 ═══════════ -->
+    <div class="settings-btn" onclick="openSystemConfig()" title="系统设置">
+      <i class="fa-solid fa-gear"></i>
+    </div>
 
-<div id="back-to-top" class="back-to-top" onclick="scrollToTop()">
-    <i class="fa-solid fa-arrow-up"></i>
-</div>
+    <!-- ═══════════ 返回顶部 ═══════════ -->
+    <div id="back-to-top" class="back-to-top" onclick="scrollToTop()">
+      <i class="fa-solid fa-arrow-up"></i>
+    </div>
 
-<div class="settings-float" onclick="openSystemConfig()" title="系统配置">
-    <i class="fa-solid fa-gear"></i>
-</div>
-<form id="auth-float-form" class="auth-float auth-login" action="{{.Root}}/logout" method="post" title="登录">
-    <button id="auth-float-button" type="submit">
-        <i id="auth-float-icon" class="fa-solid fa-right-to-bracket"></i>
-    </button>
-</form>
+    <!-- ═══════════ 应用布局（侧边栏 + 内容 + 播放器） ═══════════ -->
+    <div class="app-layout">
+      <!-- ── 侧边栏 ── -->
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <div class="sidebar-brand-icon">
+            <i class="fa-solid fa-music"></i>
+          </div>
+          Music
+        </div>
+        <div class="sidebar-search">
+          <form id="sidebar-search-form" action="{{.Root}}/search" method="get">
+            <input type="hidden" name="type" value="song" />
+            <input type="hidden" name="page" value="1" />
+            <div class="sidebar-search-wrap">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input
+                type="text"
+                name="q"
+                id="sidebar-search-input"
+                placeholder="搜索你的音乐&hellip;"
+                value="{{.Keyword}}"
+                autocomplete="off"
+              />
+            </div>
+          </form>
+        </div>
 
-<div class="container">
-    {{template "search_box" .}}
+        <nav class="sidebar-nav">
+          <span class="sidebar-nav-label">浏览</span>
+          <button
+            class="sidebar-item active"
+            onclick="navigateTo('{{.Root}}/search?type=song')"
+          >
+            <i class="fa-solid fa-music"></i> 歌曲
+          </button>
+          <button
+            class="sidebar-item"
+            onclick="navigateTo('{{.Root}}/search?type=playlist')"
+          >
+            <i class="fa-solid fa-list"></i> 歌单
+          </button>
+          <button
+            class="sidebar-item"
+            onclick="navigateTo('{{.Root}}/search?type=album')"
+          >
+            <i class="fa-solid fa-compact-disc"></i> 专辑
+          </button>
+          <button class="sidebar-item" onclick="goToRecommend()">
+            <i class="fa-solid fa-fire"></i> 每日推荐
+          </button>
 
-    {{template "playlist_categories" .}}
+          <span class="sidebar-nav-label">资料库</span>
+          <button class="sidebar-item" onclick="openCollectionManager()">
+            <i class="fa-solid fa-folder-open"></i> 本地歌单
+          </button>
+          <button class="sidebar-item" onclick="openLocalMusicPage()">
+            <i class="fa-solid fa-hard-drive"></i> 本地音乐
+          </button>
+          <button class="sidebar-item" onclick="goToPlaylistCategories()">
+            <i class="fa-solid fa-table-cells-large"></i> 歌单分类
+          </button>
+          <button class="sidebar-item" onclick="goToUserPlaylists()">
+            <i class="fa-solid fa-heart"></i> 我的歌单
+          </button>
+        </nav>
 
-    {{template "playlist_source_tabs" .}}
+        <div class="sidebar-bottom">
+          <form
+            id="auth-float-form"
+            action="{{.Root}}/logout"
+            method="post"
+            style="margin: 0"
+          >
+            <button
+              id="auth-float-button"
+              type="submit"
+              class="sidebar-item"
+              style="width: 100%"
+            >
+              <i id="auth-float-icon" class="fa-solid fa-right-to-bracket"></i>
+              登录
+            </button>
+          </form>
+        </div>
+      </aside>
 
-    {{template "playlist_grid" .}}
+      <!-- ── 主内容区 ── -->
+      <main class="main-content">
+        {{template "search_box" .}} {{template "playlist_categories" .}}
+        {{template "playlist_source_tabs" .}} {{template "playlist_grid" .}}
+        {{template "song_list" .}}
+      </main>
 
-    {{template "song_list" .}}
-</div>
+      <!-- ── 底部播放器 ── -->
+      <footer class="player-bar" id="player-bar">
+        <div class="player-bar-info">
+          <img
+            class="player-bar-art"
+            id="player-bar-art"
+            src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 44'><rect fill='%23e5e5ea' width='44' height='44' rx='6'/><text x='22' y='28' text-anchor='middle' fill='%23aeaeb2' font-size='20'>♪</text></svg>"
+            alt=""
+          />
+          <div>
+            <div class="player-bar-title" id="player-bar-title">未在播放</div>
+            <div class="player-bar-artist" id="player-bar-artist">
+              选择歌曲开始
+            </div>
+          </div>
+        </div>
+        <div class="player-bar-controls">
+          <button class="icon-btn" onclick="prevTrack()" title="上一首">
+            <i class="fa-solid fa-backward"></i>
+          </button>
+          <button
+            class="icon-btn play-btn"
+            onclick="togglePlayPause()"
+            title="播放/暂停"
+            id="player-play-btn"
+          >
+            <i class="fa-solid fa-play"></i>
+          </button>
+          <button class="icon-btn" onclick="nextTrack()" title="下一首">
+            <i class="fa-solid fa-forward"></i>
+          </button>
+        </div>
+        <div class="player-bar-right">
+          <!-- login button moved to sidebar -->
+        </div>
+      </footer>
+    </div>
 
-{{template "modals" .}}
+    {{template "modals" .}}
 
-<div id="aplayer"></div>
+    <div id="aplayer"></div>
 
-<div id="sakana-container" class="sakana-container">
-    <div id="sakana-widget"></div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/aplayer/dist/APlayer.min.js"></script>
-
-<script>
-    window.API_ROOT = "{{.Root}}";
-    window.sakanaInstance = null;
-    
-
-    function initSakanaWidget() {
-        if (window.innerWidth > 768) {
-            window.sakanaInstance = new SakanaWidget().mount('#sakana-widget');
-        }
-    }
-
-</script>
-
-<script src="{{.Root}}/app.js"></script>
-{{template "videogen_modal" .}}
-<script src="{{.Root}}/videogen.js"></script>
-
-<script async onload="initSakanaWidget()" src="https://cdn.jsdelivr.net/npm/sakana-widget@2.7.1/lib/sakana.min.js"></script>
-
-</body>
+    <script src="https://cdn.jsdelivr.net/npm/aplayer/dist/APlayer.min.js"></script>
+    <script>
+      window.API_ROOT = "{{.Root}}";
+    </script>
+    <script src="{{.Root}}/app.js"></script>
+    {{template "videogen_modal" .}}
+    <script src="{{.Root}}/videogen.js"></script>
+  </body>
 </html>
