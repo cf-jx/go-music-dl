@@ -9,19 +9,19 @@
                 <label class="segment {{ if or (eq .SearchType "song") (eq .SearchType "local_music") (not .SearchType) }}active{{ end }}">
                     <input type="radio" name="type" value="song"
                         {{ if or (eq .SearchType "song") (eq .SearchType "local_music") (not .SearchType) }}checked{{ end }}
-                        onchange="this.form.submit()" hidden>
+                        onchange="this.form.requestSubmit()" hidden>
                     歌曲
                 </label>
                 <label class="segment {{ if eq .SearchType "playlist" }}active{{ end }}">
                     <input type="radio" name="type" value="playlist"
                         {{ if eq .SearchType "playlist" }}checked{{ end }}
-                        onchange="this.form.submit()" hidden>
+                        onchange="this.form.requestSubmit()" hidden>
                     歌单
                 </label>
                 <label class="segment {{ if eq .SearchType "album" }}active{{ end }}">
                     <input type="radio" name="type" value="album"
                         {{ if eq .SearchType "album" }}checked{{ end }}
-                        onchange="this.form.submit()" hidden>
+                        onchange="this.form.requestSubmit()" hidden>
                     专辑
                 </label>
             </div>

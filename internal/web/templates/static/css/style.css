@@ -1481,6 +1481,25 @@ body.batch-mode .song-row {
 .source-selector.is-collapsed .source-grid { display: none; }
 .source-selector.is-collapsed .source-collapse-icon { transform: rotate(180deg); }
 .source-collapse-btn { background: none; border: none; padding: 0; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; display: inline-block; }
+.source-collapse-btn {
+	background: var(--bg-content) !important;
+	border: 1px solid var(--border) !important;
+	padding: 6px 12px !important;
+	border-radius: var(--r-sm) !important;
+	display: inline-flex !important;
+	align-items: center !important;
+	gap: 6px !important;
+	cursor: pointer !important;
+	color: var(--text-secondary) !important;
+	font-size: 13px !important;
+	font-weight: 500 !important;
+	transition: all var(--ease) !important;
+}
+.source-collapse-btn:hover {
+	color: var(--accent) !important;
+	background: var(--bg-hover) !important;
+	border-color: var(--accent) !important;
+}
 
 /* Toast Container Mobile-safe */
 .app-toast-container {
@@ -1731,10 +1750,6 @@ body.batch-mode .song-row {
 	grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
 	gap: 6px;
 	margin-top: 10px;
-	display: none;
-}
-.source-grid.open {
-	display: grid;
 }
 .source-chip {
 	display: flex;
