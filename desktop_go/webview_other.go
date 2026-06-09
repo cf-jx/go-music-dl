@@ -21,7 +21,7 @@ func main() {
 	}
 
 	w := webview.New(false)
-	w.SetTitle("music-dl-desktop-go")
+	w.SetTitle("TuneFlow")
 	w.SetSize(1350, 780, webview.Hint(webview.HintNone))
 	w.Navigate(target)
 

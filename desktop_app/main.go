@@ -157,7 +157,7 @@ func main() {
 
 	go func() {
 		window := new(app.Window)
-		window.Option(app.Title("music-dl"))
+		window.Option(app.Title("TuneFlow"))
 		if err := newDesktopApp(window, initialNav).run(); err != nil {
 			log.Fatal(err)
 		}

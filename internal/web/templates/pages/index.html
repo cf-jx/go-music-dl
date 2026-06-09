@@ -7,7 +7,7 @@
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
     <meta name="referrer" content="no-referrer" />
-    <title>Music &mdash; 聚合搜索</title>
+    <title>TuneFlow &mdash; 聚合搜索</title>
     <link rel="icon" href="{{.Root}}/icon.png" type="image/png" />
     <link rel="stylesheet" href="{{.Root}}/style.css" />
     <link rel="stylesheet" href="{{.Root}}/videogen.css" />
@@ -21,6 +21,11 @@
     />
   </head>
   <body>
+    <!-- ═══════════ 主题切换按钮 ═══════════ -->
+    <div class="theme-toggle-btn" onclick="toggleTheme()" title="切换深色/浅色模式">
+      <i class="fa-solid fa-moon"></i>
+    </div>
+
     <!-- ═══════════ 设置按钮 ═══════════ -->
     <div class="settings-btn" onclick="openSystemConfig()" title="系统设置">
       <i class="fa-solid fa-gear"></i>
@@ -39,7 +44,7 @@
           <div class="sidebar-brand-icon">
             <i class="fa-solid fa-music"></i>
           </div>
-          Music
+          TuneFlow
         </div>
         <div class="sidebar-search">
           <form id="sidebar-search-form" action="{{.Root}}/search" method="get">

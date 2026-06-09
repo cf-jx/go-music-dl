@@ -1629,6 +1629,30 @@ body.batch-mode .song-row {
 	color: var(--accent);
 }
 
+/* ── 主题切换按钮 ── */
+.theme-toggle-btn {
+	position: fixed;
+	top: 16px;
+	right: 60px;
+	width: 34px;
+	height: 34px;
+	border-radius: var(--r-sm);
+	background: var(--bg-content);
+	border: 1px solid var(--border);
+	box-shadow: var(--shadow-sm);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-secondary);
+	cursor: pointer;
+	z-index: 150;
+	transition: all var(--ease);
+}
+.theme-toggle-btn:hover {
+	background: var(--bg-hover);
+	color: var(--accent);
+}
+
 /* ── Spotify-like resolved note ── */
 .resolved-note {
 	display: flex;
@@ -2078,5 +2102,9 @@ body.batch-mode .checkbox-wrapper {
 	.settings-btn {
 		top: 8px;
 		right: 8px;
+	}
+	.theme-toggle-btn {
+		top: 8px;
+		right: 48px;
 	}
 }

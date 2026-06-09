@@ -5165,6 +5165,14 @@ const ThemeManager = {
         if (chk) {
             chk.checked = this.isDarkActive();
         }
+        const themeBtnIcon = document.querySelector('.theme-toggle-btn i');
+        if (themeBtnIcon) {
+            if (this.isDarkActive()) {
+                themeBtnIcon.className = 'fa-solid fa-sun';
+            } else {
+                themeBtnIcon.className = 'fa-solid fa-moon';
+            }
+        }
     },
     isDarkActive() {
         const theme = localStorage.getItem('theme-mode') || 'auto';
@@ -5178,3 +5186,9 @@ const ThemeManager = {
     }
 };
 window.ThemeManager = ThemeManager;
+
+function toggleTheme() {
+    const isDark = ThemeManager.isDarkActive();
+    ThemeManager.set(isDark ? 'light' : 'dark');
+}
+window.toggleTheme = toggleTheme;
