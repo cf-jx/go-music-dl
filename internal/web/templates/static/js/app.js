@@ -773,7 +773,18 @@ function initSourceSelectorCollapse(root = document) {
 
 function bindSearchForm(root = document) {
     const searchForm = root.querySelector('#search-form');
-    if (!searchForm) return;
+    if (searchForm) {
+        bindSingleSearchForm(searchForm);
+    }
+    const sidebarForm = document.querySelector('#sidebar-search-form');
+    if (sidebarForm && !sidebarForm.dataset.bound) {
+        bindSingleSearchForm(sidebarForm);
+    }
+}
+
+function bindSingleSearchForm(searchForm) {
+    if (!searchForm || searchForm.dataset.bound === '1') return;
+    searchForm.dataset.bound = '1';
 
     searchForm.onsubmit = (event) => {
         event.preventDefault();
@@ -799,7 +810,7 @@ function bindSongCardCovers(root = document) {
     cards.forEach((card, index) => {
         queueInspectSong(card, index * INSPECT_REQUEST_DELAY_MS);
 
-        const coverWrap = card.querySelector('.song-art');
+        const coverWrap = card.querySelector('.song-col--art');
         if (!coverWrap) return;
 
         coverWrap.style.cursor = 'pointer';
@@ -807,7 +818,7 @@ function bindSongCardCovers(root = document) {
         coverWrap.onclick = (e) => {
             e.stopPropagation();
             if (window.VideoGen) {
-                const img = coverWrap.querySelector('img');
+                const img = coverWrap.querySelector('img.song-art');
                 const currentCover = img ? img.src : (card.dataset.cover || '');
 
                 window.VideoGen.open({
@@ -993,7 +1004,7 @@ function hasVisibleModalOverlay() {
 }
 
 function getActivePaginationState() {
-    const paginationBar = Array.from(document.querySelectorAll('.pagination-bar[data-current-page][data-total-pages]'))
+    const paginationBar = Array.from(document.querySelectorAll('.pagination-bar[data-current-page][data-total-pages], .pagination[data-current-page][data-total-pages]'))
         .find((bar) => bar.offsetParent !== null);
     if (!paginationBar) return null;
 
@@ -1076,54 +1087,6 @@ document.addEventListener('DOMContentLoaded', () => {
         window.history.replaceState(null, '', url.toString());
         openSystemConfig();
     }
-    return;
-    /*
-
-    const cards = document.querySelectorAll('.song-row');
-    cards.forEach((card, index) => {
-        queueInspectSong(card, index * INSPECT_REQUEST_DELAY_MS);
-    });
-
-    cards.forEach(card => {
-        const coverWrap = card.querySelector('.song-art');
-        if (!coverWrap) return;
-        
-        coverWrap.style.cursor = 'pointer';
-        coverWrap.title = '点击生成视频';
-        
-        coverWrap.onclick = (e) => {
-            e.stopPropagation();
-            if (window.VideoGen) {
-                const img = coverWrap.querySelector('img');
-                const currentCover = img ? img.src : (card.dataset.cover || '');
-
-                window.VideoGen.open({
-                    id: card.dataset.id,
-                    source: card.dataset.source,
-                    name: card.dataset.name,
-                    artist: card.dataset.artist,
-                    cover: currentCover,
-                    duration: parseInt(card.dataset.duration) || 0
-                });
-            } else {
-                console.error("VideoGen library not loaded.");
-                alert("视频生成组件加载失败，请刷新页面重试");
-            }
-        };
-    });
-
-    document.addEventListener('click', async function(event) {
-        const link = event.target.closest('.btn-download');
-        if (!link) return;
-        if (!webSettings.downloadToLocal) return;
-        event.preventDefault();
-        await handleDownloadClick(link);
-    });
-
-    updateBatchToolbar();
-
-    syncAllPlayButtons();
-    */
 });
 
 function toggleSearchType(type) {
@@ -1436,8 +1399,8 @@ function renderLocalMusicPageCard(track) {
     const album = song.album || '';
     const cover = song.cover || '';
     const coverHTML = cover
-        ? `<img src="${escapeHTML(cover)}" alt="${escapeHTML(song.name)}" loading="lazy" onerror="this.src='https://via.placeholder.com/150?text=Music'">`
-        : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:24px;">♪</div><img src="https://via.placeholder.com/150?text=Music" style="display:none;">`;
+        ? `<img class="song-art" src="${escapeHTML(cover)}" alt="${escapeHTML(song.name)}" loading="lazy" onerror="this.src='https://via.placeholder.com/150?text=Music'">`
+        : `<div class="song-art-placeholder" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:24px;">♪</div>`;
 
     const lyricButton = song.extra && song.extra.lyric
         ? `<a href="${escapeHTML(lyricURLsForSong({ ...song, extra: extraJSON }).download)}" id="lrc-${escapeHTML(song.id)}" class="icon-btn" title="下载歌词" target="_blank"><i class="fa-solid fa-file-lines"></i></a>`
@@ -1640,7 +1603,7 @@ function songFromCard(card) {
 
     let coverUrl = ds.cover || '';
     const imgEl = card.querySelector('.song-art');
-    if (imgEl && imgEl.src) {
+    if (imgEl && imgEl.src && !imgEl.src.startsWith('data:')) {
         coverUrl = imgEl.src;
     }
 
@@ -3843,13 +3806,22 @@ function updateCardWithSong(card, song, options = {}) {
         durationTag.textContent = formatDuration(song.duration);
     }
 
-    const coverWrap = card.querySelector('.song-art');
+    const coverWrap = card.querySelector('.song-col--art');
     if (coverWrap) {
-        let imgEl = coverWrap.querySelector('img');
+        let imgEl = coverWrap.querySelector('img.song-art');
         if (!imgEl) {
             imgEl = document.createElement('img');
-            coverWrap.innerHTML = '';
-            coverWrap.appendChild(imgEl);
+            imgEl.className = 'song-art';
+            // Insert before the overlay
+            const overlay = coverWrap.querySelector('.song-art-overlay');
+            if (overlay) {
+                coverWrap.insertBefore(imgEl, overlay);
+            } else {
+                coverWrap.appendChild(imgEl);
+            }
+            // Remove placeholder if present
+            const placeholder = coverWrap.querySelector('.song-art-placeholder');
+            if (placeholder) placeholder.remove();
         }
         imgEl.src = song.cover || 'https://via.placeholder.com/150?text=Music';
         imgEl.alt = song.name || '';
