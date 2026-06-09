@@ -69,11 +69,13 @@
 {{ end }}
 
 <!-- 音源选择器（折叠） -->
-<div class="source-selector">
-    <button type="button" class="source-toggle" onclick="toggleSourceSelector()" aria-expanded="false">
-        <i class="fa-solid fa-sliders"></i> 搜索源设置
-        <i class="fa-solid fa-chevron-down source-collapse-icon" style="font-size:10px;"></i>
-    </button>
+<div class="source-selector" id="source-selector">
+    <div class="source-actions">
+        <button type="button" class="source-collapse-btn" onclick="toggleSourceSelector()" aria-controls="source-grid">
+            <i class="fa-solid fa-sliders"></i> 搜索源设置
+            <i class="fa-solid fa-chevron-up source-collapse-icon" style="font-size:10px;"></i>
+        </button>
+    </div>
     <div class="source-grid" id="source-grid">
         {{ range $source := .AllSources }}
         <label class="source-chip

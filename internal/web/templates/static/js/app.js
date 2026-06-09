@@ -1,4 +1,4 @@
-﻿// templates/app.js
+// templates/app.js
 
 const API_ROOT = window.API_ROOT;
 const WEB_SETTINGS_KEY = 'musicdl:web_settings';
@@ -2561,11 +2561,29 @@ async function openSystemConfig() {
             if (el) el.value = v;
         }
         setAuthFloatLoggedIn(true);
-        if (modal) modal.style.display = 'flex';
+        if (modal) {
+            modal.style.display = 'flex';
+            const firstTab = modal.querySelector('.modal-pref-tab');
+            if (firstTab) {
+                switchPrefTab('pref-general', firstTab);
+            }
+        }
     } catch (error) {
         applyWebSettings(webSettings);
         showToast('系统配置加载失败', error.message || '请稍后重试', 'error');
     }
+}
+
+function switchPrefTab(panelId, tabElement) {
+    const modal = document.getElementById('cookieModal');
+    if (!modal) return;
+    const tabs = modal.querySelectorAll('.modal-pref-tab');
+    tabs.forEach(tab => tab.classList.remove('active'));
+    if (tabElement) tabElement.classList.add('active');
+    const panels = modal.querySelectorAll('.pref-panel');
+    panels.forEach(panel => panel.classList.remove('active'));
+    const targetPanel = document.getElementById(panelId);
+    if (targetPanel) targetPanel.classList.add('active');
 }
 
 function openCookieModal() {
