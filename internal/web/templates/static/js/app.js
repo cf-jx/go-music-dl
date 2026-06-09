@@ -509,7 +509,7 @@ function updateCoverButton(link) {
 
 function refreshDownloadLinks(root = document) {
     root.querySelectorAll('.song-row').forEach(card => {
-        updateDownloadButton(card.querySelector('.btn-download'));
+        updateDownloadButton(card.querySelector('.btn-dl:not(.btn-browser-download):not(.btn-lyric):not(.btn-cover)'));
         updateBrowserDownloadButton(card.querySelector('.btn-browser-download'));
         updateLyricButton(card.querySelector('.btn-lyric'));
         updateCoverButton(card.querySelector('.btn-cover'));
@@ -867,7 +867,7 @@ function shouldHandleInternalNavigation(link, event) {
         return false;
     }
 
-    if (link.classList.contains('btn-download') || link.classList.contains('btn-lyric') || link.classList.contains('btn-cover')) {
+    if (link.classList.contains('btn-dl') || link.classList.contains('btn-lyric') || link.classList.contains('btn-cover')) {
         return false;
     }
 
@@ -1033,7 +1033,7 @@ function bindPageNavigationEvents() {
     pageNavigationEventsBound = true;
 
     document.addEventListener('click', async (event) => {
-        const link = event.target.closest('.btn-download, .btn-lyric, .btn-cover');
+        const link = event.target.closest('.btn-dl, .btn-lyric, .btn-cover');
         if (!link) return;
         event.preventDefault();
         await handleDownloadClick(link);
@@ -3871,7 +3871,7 @@ function updateCardWithSong(card, song, options = {}) {
         };
     }
 
-    const dl = card.querySelector('.btn-download');
+    const dl = card.querySelector('.btn-dl:not(.btn-browser-download):not(.btn-lyric):not(.btn-cover)');
     if (dl) {
         dl.href = buildDownloadURL(song.id, song.source, song.name, song.artist, song.album || '', song.cover || '', card.dataset.extra || '');
         dl.id = `dl-${song.id}`;
