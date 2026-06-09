@@ -664,16 +664,24 @@ async function handleDownloadClick(link) {
 
     link.style.pointerEvents = 'none';
     link.style.opacity = '0.6';
+    
+    const card = link.closest('.song-row');
+    const song = card ? songFromCard(card) : songFromURL(link.href);
+    const downloadEntry = DownloadManager.add(song);
+
     try {
         const data = await requestLocalDownload(link.href);
         let message = data.path || webSettings.downloadDir;
         if (data.warning) {
             message += `\n提示: ${data.warning}`;
         }
+        DownloadManager.success(downloadEntry, message);
         showToast('下载完成', message, data.warning ? 'warning' : 'success');
         return true;
     } catch (error) {
-        showToast('下载失败', error.message || '下载失败', 'error');
+        const errorMsg = error.message || '下载失败';
+        DownloadManager.failed(downloadEntry, errorMsg);
+        showToast('下载失败', errorMsg, 'error');
     } finally {
         link.style.pointerEvents = '';
         link.style.opacity = '';
@@ -839,6 +847,7 @@ function initializePageContent(root = document) {
     syncAllPlayButtons();
     syncMediaSession();
     initializeLocalMusicPage(root);
+    syncSidebarActiveState();
 }
 
 function shouldHandleInternalNavigation(link, event) {
@@ -878,6 +887,14 @@ async function navigateTo(url, options = {}) {
         targetURL = new URL(url, window.location.href);
     } catch (_) {
         return false;
+    }
+
+    if (targetURL.hash === '#/downloading') {
+        showDownloadingPage({ updateHistory: options.historyMode !== 'none' });
+        return true;
+    } else if (targetURL.hash === '#/downloaded') {
+        showDownloadedPage({ updateHistory: options.historyMode !== 'none' });
+        return true;
     }
 
     if (targetURL.origin !== window.location.origin || !isAppRoute(targetURL.pathname)) {
@@ -1042,6 +1059,7 @@ function bindPageNavigationEvents() {
 
 document.addEventListener('DOMContentLoaded', () => {
     ThemeManager.init();
+    DownloadManager.init();
     loadWebSettingsFromCache();
     applyWebSettings(webSettings);
     bindAuthFloat();
@@ -1049,6 +1067,9 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchWebSettings().finally(() => maybeAutoCheckUpdate());
     bindPageNavigationEvents();
     initializePageContent(document);
+    if (window.location.hash === '#/downloading' || window.location.hash === '#/downloaded') {
+        navigateTo(window.location.hash, { historyMode: 'none' });
+    }
     if (new URLSearchParams(window.location.search).get(OPEN_CONFIG_QUERY) === '1') {
         const url = new URL(window.location.href);
         url.searchParams.delete(OPEN_CONFIG_QUERY);
@@ -4323,16 +4344,22 @@ async function batchDownload() {
 
     try {
         for (const song of songs) {
+            const downloadEntry = DownloadManager.add(song);
             try {
                 const result = await requestLocalDownload(song.url);
                 success++;
+                let message = (result && result.path) || webSettings.downloadDir;
                 if (result && result.warning) {
                     warningCount++;
+                    message += `\n提示: ${result.warning}`;
                 }
+                DownloadManager.success(downloadEntry, message);
             } catch (error) {
+                const errorMsg = (error && error.message) ? error.message : '下载失败';
+                DownloadManager.failed(downloadEntry, errorMsg);
                 failures.push({
                     song,
-                    reason: (error && error.message) ? error.message : '下载失败'
+                    reason: errorMsg
                 });
             }
         }
@@ -5165,12 +5192,15 @@ const ThemeManager = {
         if (chk) {
             chk.checked = this.isDarkActive();
         }
-        const themeBtnIcon = document.querySelector('.theme-toggle-btn i');
-        if (themeBtnIcon) {
+        const themeBtnIcon = document.querySelector('#sidebar-theme-btn i');
+        const themeBtnText = document.querySelector('#sidebar-theme-btn span');
+        if (themeBtnIcon && themeBtnText) {
             if (this.isDarkActive()) {
                 themeBtnIcon.className = 'fa-solid fa-sun';
+                themeBtnText.textContent = '浅色模式';
             } else {
                 themeBtnIcon.className = 'fa-solid fa-moon';
+                themeBtnText.textContent = '深色模式';
             }
         }
     },
@@ -5192,3 +5222,275 @@ function toggleTheme() {
     ThemeManager.set(isDark ? 'light' : 'dark');
 }
 window.toggleTheme = toggleTheme;
+
+const DownloadManager = {
+    active: [],
+    completed: [],
+
+    init() {
+        this.active = [];
+        try {
+            const stored = localStorage.getItem('completed-downloads');
+            this.completed = stored ? JSON.parse(stored) : [];
+        } catch (_) {
+            this.completed = [];
+        }
+        this.updateBadge();
+    },
+
+    save() {
+        try {
+            localStorage.setItem('completed-downloads', JSON.stringify(this.completed));
+        } catch (_) {}
+    },
+
+    add(song) {
+        if (!song || !song.id) return null;
+        const entry = {
+            id: song.id + '-' + Date.now(),
+            songId: song.id,
+            name: song.name,
+            artist: song.artist,
+            album: song.album || '',
+            cover: song.cover || '',
+            status: 'downloading',
+            timestamp: Date.now()
+        };
+        this.active.push(entry);
+        this.updateBadge();
+        this.refreshPagesIfActive();
+        return entry;
+    },
+
+    success(entry, path) {
+        if (!entry) return;
+        this.active = this.active.filter(item => item.id !== entry.id);
+        entry.status = 'success';
+        entry.path = path || '';
+        entry.timestamp = Date.now();
+        this.completed.push(entry);
+        this.save();
+        this.updateBadge();
+        this.refreshPagesIfActive();
+    },
+
+    failed(entry, errorMsg) {
+        if (!entry) return;
+        this.active = this.active.filter(item => item.id !== entry.id);
+        entry.status = 'failed';
+        entry.error = errorMsg || '下载失败';
+        entry.timestamp = Date.now();
+        this.completed.push(entry);
+        this.save();
+        this.updateBadge();
+        this.refreshPagesIfActive();
+    },
+
+    clearHistory() {
+        this.completed = [];
+        this.save();
+        this.refreshPagesIfActive();
+    },
+
+    updateBadge() {
+        const badge = document.getElementById('downloading-badge');
+        if (badge) {
+            const count = this.active.length;
+            if (count > 0) {
+                badge.textContent = String(count);
+                badge.style.display = 'inline-block';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+    },
+
+    refreshPagesIfActive() {
+        if (window.location.hash === '#/downloading') {
+            showDownloadingPage({ updateHistory: false });
+        } else if (window.location.hash === '#/downloaded') {
+            showDownloadedPage({ updateHistory: false });
+        }
+    }
+};
+window.DownloadManager = DownloadManager;
+
+function showDownloadingPage(options = {}) {
+    updateActiveSidebarItem('sidebar-downloading-btn');
+    if (options.updateHistory !== false) {
+        window.history.pushState(null, '', '#/downloading');
+    }
+
+    const container = document.querySelector('.container');
+    if (!container) return;
+
+    let itemsHtml = '';
+    if (DownloadManager.active.length === 0) {
+        itemsHtml = `
+            <div class="empty-state">
+                <i class="fa-solid fa-spinner"></i>
+                <p>当前没有正在下载的音乐</p>
+            </div>
+        `;
+    } else {
+        itemsHtml = `
+            <div class="download-list">
+                ${DownloadManager.active.map(item => `
+                    <div class="download-item card">
+                        <img class="download-item-art" src="${item.cover || '/icon.png'}" onerror="this.src='/icon.png'">
+                        <div class="download-item-info">
+                            <div class="download-item-title">${escapeHTML(item.name)}</div>
+                            <div class="download-item-artist">${escapeHTML(item.artist)} — ${escapeHTML(item.album)}</div>
+                        </div>
+                        <div class="download-item-status">
+                            <i class="fa-solid fa-spinner fa-spin"></i> 正在下载...
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    container.innerHTML = `
+        <div class="content-header">
+            <h1 class="page-title">下载中</h1>
+        </div>
+        <div class="download-page-content">
+            ${itemsHtml}
+        </div>
+    `;
+}
+window.showDownloadingPage = showDownloadingPage;
+
+function showDownloadedPage(options = {}) {
+    updateActiveSidebarItem('sidebar-downloaded-btn');
+    if (options.updateHistory !== false) {
+        window.history.pushState(null, '', '#/downloaded');
+    }
+
+    const container = document.querySelector('.container');
+    if (!container) return;
+
+    let itemsHtml = '';
+    const completed = DownloadManager.completed;
+    if (completed.length === 0) {
+        itemsHtml = `
+            <div class="empty-state">
+                <i class="fa-solid fa-circle-down"></i>
+                <p>暂无已下载的音乐记录</p>
+            </div>
+        `;
+    } else {
+        itemsHtml = `
+            <div class="download-history-actions" style="margin-bottom: 15px; display: flex; justify-content: flex-end;">
+                <button class="cookie-qr-btn danger" onclick="clearDownloadHistory()">
+                    <i class="fa-solid fa-trash"></i> 清空历史记录
+                </button>
+            </div>
+            <div class="download-list">
+                ${completed.map((item, idx) => `
+                    <div class="download-item card ${item.status}">
+                        <img class="download-item-art" src="${item.cover || '/icon.png'}" onerror="this.src='/icon.png'">
+                        <div class="download-item-info">
+                            <div class="download-item-title">${escapeHTML(item.name)}</div>
+                            <div class="download-item-artist">${escapeHTML(item.artist)} — ${escapeHTML(item.album)}</div>
+                            <div class="download-item-path">${escapeHTML(item.path || '')}</div>
+                        </div>
+                        <div class="download-item-right">
+                            <div class="download-item-time">${formatTimeAgo(item.timestamp)}</div>
+                            <div class="download-item-status-tag ${item.status}">
+                                ${item.status === 'success' 
+                                    ? '<span class="status-success"><i class="fa-solid fa-circle-check"></i> 成功</span>' 
+                                    : `<span class="status-failed" title="${escapeHTML(item.error || '未知错误')}"><i class="fa-solid fa-circle-xmark"></i> 失败</span>`
+                                }
+                            </div>
+                        </div>
+                    </div>
+                `).reverse().join('')}
+            </div>
+        `;
+    }
+
+    container.innerHTML = `
+        <div class="content-header">
+            <h1 class="page-title">下载完成</h1>
+        </div>
+        <div class="download-page-content">
+            ${itemsHtml}
+        </div>
+    `;
+}
+window.showDownloadedPage = showDownloadedPage;
+
+function clearDownloadHistory() {
+    if (confirm('确定要清空全部已下载历史记录吗？')) {
+        DownloadManager.clearHistory();
+    }
+}
+window.clearDownloadHistory = clearDownloadHistory;
+
+function updateActiveSidebarItem(activeId) {
+    document.querySelectorAll('.sidebar-item').forEach(item => {
+        item.classList.toggle('active', item.id === activeId);
+    });
+}
+window.updateActiveSidebarItem = updateActiveSidebarItem;
+
+function formatTimeAgo(timestamp) {
+    if (!timestamp) return '未知时间';
+    const diff = Date.now() - timestamp;
+    const seconds = Math.floor(diff / 1000);
+    if (seconds < 60) return '刚刚';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}分钟前`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}小时前`;
+    const days = Math.floor(hours / 24);
+    return `${days}天前`;
+}
+window.formatTimeAgo = formatTimeAgo;
+
+function songFromURL(urlStr) {
+    try {
+        const urlObj = new URL(urlStr, window.location.href);
+        const params = urlObj.searchParams;
+        return {
+            id: params.get('id') || '',
+            source: params.get('source') || '',
+            name: params.get('name') || '未知歌曲',
+            artist: params.get('artist') || '未知歌手',
+            album: params.get('album') || '',
+            cover: params.get('cover') || ''
+        };
+    } catch (_) {
+        return null;
+    }
+}
+window.songFromURL = songFromURL;
+
+function syncSidebarActiveState() {
+    const currentPath = window.location.pathname;
+    const currentHash = window.location.hash;
+    const currentSearch = window.location.search;
+    
+    const sidebarItems = document.querySelectorAll('.sidebar-item');
+    sidebarItems.forEach(item => {
+        item.classList.remove('active');
+        
+        const onclickAttr = item.getAttribute('onclick') || '';
+        
+        if (currentHash && onclickAttr.includes(currentHash)) {
+            item.classList.add('active');
+        } else if (!currentHash && onclickAttr.includes('navigateTo')) {
+            const match = onclickAttr.match(/navigateTo\('([^']+)'\)/);
+            if (match && match[1]) {
+                const targetUrl = new URL(match[1], window.location.origin);
+                const targetSearch = targetUrl.search;
+                if (targetUrl.pathname === currentPath && (!targetSearch || currentSearch.includes(targetSearch))) {
+                    item.classList.add('active');
+                }
+            }
+        }
+    });
+}
+window.syncSidebarActiveState = syncSidebarActiveState;
