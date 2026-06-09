@@ -352,7 +352,7 @@ function bindAuthFloat() {
     const form = document.getElementById('auth-float-form');
     if (!form || form.dataset.bound === '1') return;
     form.dataset.bound = '1';
-    form.addEventListener('submit', function(event) {
+    form.addEventListener('submit', (event) => {
         if (form.dataset.loggedIn === '1') return;
         event.preventDefault();
         openSystemConfig();
@@ -449,7 +449,7 @@ window.lyricURLsForSong = lyricURLsForSong;
 function updateDownloadButton(link) {
     if (!link) return;
 
-    const card = link.closest('.song-card');
+    const card = link.closest('.song-row');
     if (!card) return;
 
     const ds = card.dataset;
@@ -460,7 +460,7 @@ function updateDownloadButton(link) {
 function updateBrowserDownloadButton(link) {
     if (!link) return;
 
-    const card = link.closest('.song-card');
+    const card = link.closest('.song-row');
     if (!card) return;
 
     const ds = card.dataset;
@@ -471,7 +471,7 @@ function updateBrowserDownloadButton(link) {
 function updateLyricButton(link) {
     if (!link) return;
 
-    const card = link.closest('.song-card');
+    const card = link.closest('.song-row');
     const song = songFromCard(card);
     if (!song) return;
 
@@ -500,7 +500,7 @@ function buildCoverDownloadURL(song) {
 function updateCoverButton(link) {
     if (!link) return;
 
-    const card = link.closest('.song-card');
+    const card = link.closest('.song-row');
     const song = songFromCard(card);
     if (!song) return;
 
@@ -508,7 +508,7 @@ function updateCoverButton(link) {
 }
 
 function refreshDownloadLinks(root = document) {
-    root.querySelectorAll('.song-card').forEach(card => {
+    root.querySelectorAll('.song-row').forEach(card => {
         updateDownloadButton(card.querySelector('.btn-download'));
         updateBrowserDownloadButton(card.querySelector('.btn-browser-download'));
         updateLyricButton(card.querySelector('.btn-lyric'));
@@ -787,11 +787,11 @@ function bindSearchForm(root = document) {
 }
 
 function bindSongCardCovers(root = document) {
-    const cards = root.querySelectorAll('.song-card');
+    const cards = root.querySelectorAll('.song-row');
     cards.forEach((card, index) => {
         queueInspectSong(card, index * INSPECT_REQUEST_DELAY_MS);
 
-        const coverWrap = card.querySelector('.cover-wrapper');
+        const coverWrap = card.querySelector('.song-art');
         if (!coverWrap) return;
 
         coverWrap.style.cursor = 'pointer';
@@ -1015,14 +1015,14 @@ function bindPageNavigationEvents() {
     if (pageNavigationEventsBound) return;
     pageNavigationEventsBound = true;
 
-    document.addEventListener('click', async function(event) {
+    document.addEventListener('click', async (event) => {
         const link = event.target.closest('.btn-download, .btn-lyric, .btn-cover');
         if (!link) return;
         event.preventDefault();
         await handleDownloadClick(link);
     });
 
-    document.addEventListener('click', function(event) {
+    document.addEventListener('click', (event) => {
         const link = event.target.closest('a');
         if (!shouldHandleInternalNavigation(link, event)) return;
 
@@ -1032,7 +1032,7 @@ function bindPageNavigationEvents() {
 
     document.addEventListener('keydown', handlePaginationShortcut);
 
-    window.addEventListener('popstate', function() {
+    window.addEventListener('popstate', () => {
         navigateTo(window.location.href, {
             historyMode: 'none',
             scroll: false
@@ -1040,7 +1040,7 @@ function bindPageNavigationEvents() {
     });
 }
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', () => {
     loadWebSettingsFromCache();
     applyWebSettings(webSettings);
     bindAuthFloat();
@@ -1057,13 +1057,13 @@ document.addEventListener('DOMContentLoaded', function() {
     return;
     /*
 
-    const cards = document.querySelectorAll('.song-card');
+    const cards = document.querySelectorAll('.song-row');
     cards.forEach((card, index) => {
         queueInspectSong(card, index * INSPECT_REQUEST_DELAY_MS);
     });
 
     cards.forEach(card => {
-        const coverWrap = card.querySelector('.cover-wrapper');
+        const coverWrap = card.querySelector('.song-art');
         if (!coverWrap) return;
         
         coverWrap.style.cursor = 'pointer';
@@ -1159,10 +1159,10 @@ function switchCategorySource(tab) {
     const panelId = tab.getAttribute('data-target');
     if (!panelId) return;
     const scope = tab.closest('.category-panel') || document;
-    scope.querySelectorAll('.category-source-tab').forEach(function (t) {
+    scope.querySelectorAll('.category-source-tab').forEach((t) => {
         t.classList.toggle('is-active', t === tab);
     });
-    scope.querySelectorAll('.category-source-panel').forEach(function (p) {
+    scope.querySelectorAll('.category-source-panel').forEach((p) => {
         p.classList.toggle('is-active', p.id === panelId);
     });
 }
@@ -1260,9 +1260,9 @@ function parseBitrateToKbps(value) {
 function ensureSongSortIndexes(root = document) {
     const scope = root && typeof root.querySelectorAll === 'function' ? root : document;
     const cards = Array.from(
-        scope.matches && scope.matches('.result-list')
-            ? scope.querySelectorAll('.song-card')
-            : scope.querySelectorAll('.result-list .song-card')
+        scope.matches && scope.matches('.song-list')
+            ? scope.querySelectorAll('.song-row')
+            : scope.querySelectorAll('.song-list .song-row')
     );
     cards.forEach((card, index) => {
         if (!card.dataset.sortIndex) {
@@ -1295,13 +1295,13 @@ function songSortValue(card, mode) {
 
 function applySongSort(root = document) {
     const scope = root && typeof root.querySelector === 'function' ? root : document;
-    const list = (scope.matches && scope.matches('.result-list'))
+    const list = (scope.matches && scope.matches('.song-list'))
         ? scope
-        : (scope.querySelector('.result-list') || document.querySelector('.result-list'));
+        : (scope.querySelector('.song-list') || document.querySelector('.song-list'));
     if (!list) return;
     ensureSongSortIndexes(list);
 
-    const cards = Array.from(list.querySelectorAll('.song-card'));
+    const cards = Array.from(list.querySelectorAll('.song-row'));
     const direction = songSortDirection === 'asc' ? 1 : -1;
     cards.sort((a, b) => {
         if (songSortMode === 'default') {
@@ -1418,14 +1418,14 @@ function renderLocalMusicPageCard(track) {
         : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:24px;">♪</div><img src="https://via.placeholder.com/150?text=Music" style="display:none;">`;
 
     const lyricButton = song.extra && song.extra.lyric
-        ? `<a href="${escapeHTML(lyricURLsForSong({ ...song, extra: extraJSON }).download)}" id="lrc-${escapeHTML(song.id)}" class="btn-circle btn-dl btn-lyric" title="下载歌词" target="_blank"><i class="fa-solid fa-file-lines"></i></a>`
+        ? `<a href="${escapeHTML(lyricURLsForSong({ ...song, extra: extraJSON }).download)}" id="lrc-${escapeHTML(song.id)}" class="icon-btn" title="下载歌词" target="_blank"><i class="fa-solid fa-file-lines"></i></a>`
         : '';
     const coverButton = cover
-        ? `<a href="${escapeHTML(buildCoverDownloadURL({ ...song, extra: extraJSON }))}" class="btn-circle btn-dl btn-cover" title="下载封面" target="_blank"><i class="fa-regular fa-image"></i></a>`
+        ? `<a href="${escapeHTML(buildCoverDownloadURL({ ...song, extra: extraJSON }))}" class="icon-btn" title="下载封面" target="_blank"><i class="fa-regular fa-image"></i></a>`
         : '';
 
     return `
-        <li class="song-card"
+        <li class="song-row"
             data-id="${escapeHTML(song.id)}"
             data-source="${escapeHTML(song.source)}"
             data-album-id=""
@@ -1440,7 +1440,7 @@ function renderLocalMusicPageCard(track) {
             <div class="checkbox-wrapper">
                 <input type="checkbox" class="song-checkbox" onclick="event.stopPropagation(); updateBatchToolbar();">
             </div>
-            <div class="cover-wrapper">${coverHTML}</div>
+            <div class="song-col song-col--art">${coverHTML}</div>
             <div class="song-info">
                 <h3>${escapeHTML(song.name)}</h3>
                 <div class="artist-line">${renderArtistLineHTML(song)}</div>
@@ -1452,15 +1452,15 @@ function renderLocalMusicPageCard(track) {
                 </div>
             </div>
             <div class="actions">
-                <button type="button" class="btn-circle btn-play" title="播放" onclick="playAllAndJumpTo(this)">
+                <button type="button" class="icon-btn play-btn" title="播放" onclick="playAllAndJumpTo(this)">
                     <i class="fa-solid fa-play"></i>
                 </button>
-                <button type="button" class="btn-circle btn-fav" title="收藏到自制歌单" onclick="openAddToCollectionModal(this)">
+                <button type="button" class="icon-btn" title="收藏到自制歌单" onclick="openAddToCollectionModal(this)">
                     <i class="fa-regular fa-heart"></i>
                 </button>
                 ${lyricButton}
                 ${coverButton}
-                <button type="button" class="btn-circle btn-delete-local" title="删除本地音乐" onclick="deleteLocalMusicFromButton(this)">
+                <button type="button" class="icon-btn danger" title="删除本地音乐" onclick="deleteLocalMusicFromButton(this)">
                     <i class="fa-solid fa-trash"></i>
                 </button>
             </div>
@@ -1617,7 +1617,7 @@ function songFromCard(card) {
     if (!ds.id || !ds.source) return null;
 
     let coverUrl = ds.cover || '';
-    const imgEl = card.querySelector('.cover-wrapper img');
+    const imgEl = card.querySelector('.song-art');
     if (imgEl && imgEl.src) {
         coverUrl = imgEl.src;
     }
@@ -2713,9 +2713,9 @@ function buildMediaSessionCoverURL(audio = getCurrentAPlayerAudio()) {
 
     const currentId = String(audio?.custom_id || currentPlayingId || '').trim();
     if (currentId) {
-        const card = Array.from(document.querySelectorAll('.song-card')).find(item => item?.dataset?.id === currentId);
+        const card = Array.from(document.querySelectorAll('.song-row')).find(item => item?.dataset?.id === currentId);
         if (card) {
-            const imgEl = card.querySelector('.cover-wrapper img');
+            const imgEl = card.querySelector('.song-art');
             if (imgEl && imgEl.src) {
                 candidates.unshift({
                     url: imgEl.src,
@@ -3380,6 +3380,51 @@ window.ap = ap;
 let currentPlayingId = null;
 window.currentPlayingId = null; 
 
+// ═════ 底部播放栏桥接 ═════
+function togglePlayPause() {
+    if (!ap) return;
+    if (ap.audio.paused) { ap.play(); }
+    else { ap.pause(); }
+}
+function nextTrack() { if (ap) ap.skipForward(); }
+function prevTrack() { if (ap) ap.skipBack(); }
+
+// 同步 APlayer 状态到自定义底部播放栏
+function syncPlayerBar(audio) {
+    if (!audio) return;
+    const art = document.getElementById('player-bar-art');
+    const title = document.getElementById('player-bar-title');
+    const artist = document.getElementById('player-bar-artist');
+    const playBtn = document.getElementById('player-play-btn');
+    if (art && audio.cover) art.src = audio.cover;
+    if (title) title.textContent = audio.name || '未在播放';
+    if (artist) artist.textContent = audio.artist || '选择歌曲开始';
+    if (playBtn) {
+        const i = playBtn.querySelector('i');
+        if (i) { i.className = ap.audio.paused ? 'fa-solid fa-play' : 'fa-solid fa-pause'; }
+    }
+}
+
+ap.on('play', () => {
+    const btn = document.getElementById('player-play-btn');
+    if (btn) { const i = btn.querySelector('i'); if (i) i.className = 'fa-solid fa-pause'; }
+});
+ap.on('pause', () => {
+    const btn = document.getElementById('player-play-btn');
+    if (btn) { const i = btn.querySelector('i'); if (i) i.className = 'fa-solid fa-play'; }
+});
+
+const origListSwitch = ap.on.bind(ap);
+const origAdd = ap.list.add.bind(ap.list);
+// 在 list.add 之后更新 player bar（播放列表首项为当前播放）
+ap.list._origAdd = ap.list.add;
+const addOrig = ap.list.add;
+ap.list.add = function(audios) {
+    const result = addOrig.call(this, audios);
+    if (audios && audios.length) syncPlayerBar(audios[0]);
+    return result;
+};
+
 setupMediaSession();
 ap.audio.addEventListener('timeupdate', () => KaraokeLyrics.update());
 ap.audio.addEventListener('seeked', () => KaraokeLyrics.update());
@@ -3486,9 +3531,9 @@ ap.on('ended', () => {
 });
 
 function highlightCard(targetId) {
-    document.querySelectorAll('.song-card').forEach(c => c.classList.remove('playing-active'));
+    document.querySelectorAll('.song-row').forEach(c => c.classList.remove('playing-active'));
     if(!targetId) return;
-    const target = document.querySelector(`.song-card[data-id="${targetId}"]`);
+    const target = document.querySelector(`.song-row[data-id="${targetId}"]`);
     if (target) {
         target.classList.add('playing-active');
     }
@@ -3496,7 +3541,7 @@ function highlightCard(targetId) {
 
 function setPlayButtonState(card, isPlaying) {
     if (!card) return;
-    const btn = card.querySelector('.btn-play');
+    const btn = card.querySelector('.icon-btn.play-btn');
     if(!btn) return;
     const icon = btn.querySelector('i');
     if (!icon) return;
@@ -3508,7 +3553,7 @@ function setPlayButtonState(card, isPlaying) {
 
 function syncAllPlayButtons() {
     const isActuallyPlaying = ap?.audio && !ap.audio.paused;
-    document.querySelectorAll('.song-card').forEach(card => {
+    document.querySelectorAll('.song-row').forEach(card => {
         const id = card.dataset.id;
         const active = isActuallyPlaying && currentPlayingId && id === currentPlayingId;
         setPlayButtonState(card, active);
@@ -3558,7 +3603,7 @@ function splitArtistTokens(artist) {
     normalized = normalized.replace(/[、，；;]/g, '|');
 
     if (containsEastAsianChar(rawArtist)) {
-        normalized = normalized.replace(/[\/&]/g, '|');
+        normalized = normalized.replace(/[/&]/g, '|');
     } else {
         normalized = normalized.replace(/\s+(?:\/|&|\+)\s+/g, '|');
     }
@@ -3666,7 +3711,7 @@ function syncLocalSongActionButtons(card, song) {
     if (extra.lyric && !actions.querySelector('.btn-lyric')) {
         const lyric = document.createElement('a');
         lyric.id = `lrc-${song.id}`;
-        lyric.className = 'btn-circle btn-dl btn-lyric';
+        lyric.className = 'icon-btn';
         lyric.title = '下载歌词';
         lyric.target = '_blank';
         lyric.href = lyricURLsForSong(song).download;
@@ -3681,7 +3726,7 @@ function syncLocalSongActionButtons(card, song) {
 
     if (song.cover && !actions.querySelector('.btn-cover')) {
         const cover = document.createElement('a');
-        cover.className = 'btn-circle btn-dl btn-cover';
+        cover.className = 'icon-btn';
         cover.title = '下载封面';
         cover.target = '_blank';
         cover.href = buildCoverDownloadURL(song);
@@ -3706,7 +3751,7 @@ function updateCardWithSong(card, song, options = {}) {
     card.dataset.cover = song.cover || '';
     card.dataset.extra = serializeSongExtra(song.extra);
 
-    const titleEl = card.querySelector('.song-info h3');
+    const titleEl = card.querySelector('.song-name');
     if (titleEl) {
         if (song.link) {
             titleEl.innerHTML = `<a href="${song.link}" target="_blank" class="song-title-link" title="打开原始链接">${song.name || ''}</a>`;
@@ -3715,12 +3760,12 @@ function updateCardWithSong(card, song, options = {}) {
         }
     }
 
-    const artistLine = card.querySelector('.artist-line');
+    const artistLine = card.querySelector('.song-artist');
     if (artistLine) {
         artistLine.innerHTML = renderArtistLineHTML(song);
     }
 
-    const sourceTag = card.querySelector('.tag-src, .tag-local');
+    const sourceTag = card.querySelector('.source-badge');
     if (sourceTag) {
         const isLocal = isLocalMusicSourceValue(song.source);
         sourceTag.textContent = isLocal ? '本地' : song.source;
@@ -3728,12 +3773,12 @@ function updateCardWithSong(card, song, options = {}) {
         sourceTag.classList.toggle('tag-src', !isLocal);
     }
 
-    const durationTag = card.querySelector('.tag-duration');
+    const durationTag = card.querySelector('.song-duration');
     if (durationTag) {
         durationTag.textContent = formatDuration(song.duration);
     }
 
-    const coverWrap = card.querySelector('.cover-wrapper');
+    const coverWrap = card.querySelector('.song-art');
     if (coverWrap) {
         let imgEl = coverWrap.querySelector('img');
         if (!imgEl) {
@@ -3845,7 +3890,7 @@ function syncSongToAPlayer(oldId, newSong) {
 }
 
 function switchSource(btn, options = {}) {
-    const card = btn.closest('.song-card');
+    const card = btn.closest('.song-row');
     if (!card) return Promise.resolve(false);
 
     const ds = card.dataset;
@@ -3879,8 +3924,8 @@ function switchSource(btn, options = {}) {
 }
 
 function playAllAndJumpTo(btn) {
-    const currentCard = btn.closest('.song-card');
-    const allCards = Array.from(document.querySelectorAll('.song-card'));
+    const currentCard = btn.closest('.song-row');
+    const allCards = Array.from(document.querySelectorAll('.song-row'));
     const clickedIndex = allCards.indexOf(currentCard);
 
     if (clickedIndex === -1) return;
@@ -3907,7 +3952,7 @@ function playAllAndJumpTo(btn) {
         if (!song) return;
         const lyricURLs = lyricURLsForPlayback(song);
         let coverUrl = ds.cover || '';
-        const imgEl = card.querySelector('.cover-wrapper img');
+        const imgEl = card.querySelector('.song-art');
         if (imgEl && imgEl.src) coverUrl = imgEl.src;
 
         playlist.push({
@@ -3935,10 +3980,10 @@ function playAllAndJumpTo(btn) {
     syncAllPlayButtons();
 }
 
-window.playAllAndJumpToId = function(songId) {
-    const targetCard = document.querySelector(`.song-card[data-id="${songId}"]`);
+window.playAllAndJumpToId = (songId) => {
+    const targetCard = document.querySelector(`.song-row[data-id="${songId}"]`);
     if (targetCard) {
-        const btn = targetCard.querySelector('.btn-play');
+        const btn = targetCard.querySelector('.icon-btn.play-btn');
         if (btn) {
             playAllAndJumpTo(btn);
         }
@@ -3970,14 +4015,14 @@ function isAutoSwitchInvalidSourcesEnabled() {
 }
 
 function hasPendingSongInspections() {
-    return !!document.querySelector('.song-card[data-inspect-pending="1"]');
+    return !!document.querySelector('.song-row[data-inspect-pending="1"]');
 }
 
 function getInvalidSongCards(root = document) {
     const seen = new Set();
     const cards = [];
     root.querySelectorAll('.tag-fail').forEach(tag => {
-        const card = tag.closest('.song-card');
+        const card = tag.closest('.song-row');
         if (!card || seen.has(card) || isLocalMusicSourceValue(card.dataset.source)) return;
         if (card.dataset.autoSwitchInvalidAttempted === '1' && root === document) return;
         seen.add(card);
@@ -3990,7 +4035,7 @@ function getManualInvalidSongCards(root = document) {
     const seen = new Set();
     const cards = [];
     root.querySelectorAll('.tag-fail').forEach(tag => {
-        const card = tag.closest('.song-card');
+        const card = tag.closest('.song-row');
         if (!card || seen.has(card) || isLocalMusicSourceValue(card.dataset.source)) return;
         seen.add(card);
         cards.push(card);
@@ -4029,7 +4074,7 @@ function selectInvalidSongCards(options = {}) {
     let changed = 0;
     const invalidSet = new Set(invalidCards);
     document.querySelectorAll('.song-checkbox').forEach(checkbox => {
-        const card = checkbox.closest('.song-card');
+        const card = checkbox.closest('.song-row');
         const shouldCheck = invalidSet.has(card);
         if (!shouldCheck && options.clearExisting !== false) {
             if (checkbox.checked) {
@@ -4158,9 +4203,9 @@ function updateBatchToolbar() {
         if(batchRemoveCollection) batchRemoveCollection.disabled = true;
     }
     
-    document.querySelectorAll('.song-card').forEach(card => card.classList.remove('selected'));
+    document.querySelectorAll('.song-row').forEach(card => card.classList.remove('selected'));
     checkedBoxes.forEach(cb => {
-        cb.closest('.song-card').classList.add('selected');
+        cb.closest('.song-row').classList.add('selected');
     });
 }
 
@@ -4178,7 +4223,7 @@ function getSelectedSongs() {
     const checkedBoxes = document.querySelectorAll('.song-checkbox:checked');
     const songs = [];
     checkedBoxes.forEach(cb => {
-        const card = cb.closest('.song-card');
+        const card = cb.closest('.song-row');
         if (card) {
             const song = songFromCard(card);
             if (!song) return;
@@ -4313,7 +4358,7 @@ function stopDeletedLocalMusicPlayback(deletedIds) {
 }
 
 async function deleteLocalMusicFromButton(btn) {
-    const card = btn?.closest('.song-card');
+    const card = btn?.closest('.song-row');
     const song = songFromCard(card);
     if (!song || !isLocalMusicSourceValue(song.source)) return;
     if (!confirmLocalMusicDeletion([song])) return;
@@ -4392,7 +4437,7 @@ async function batchSwitchSource(options = {}) {
         : Array.from(document.querySelectorAll('.song-checkbox:checked'));
     if (checkedBoxes.length === 0) return false;
 
-    const candidateCards = optionCards || checkedBoxes.map(cb => cb.closest('.song-card'));
+    const candidateCards = optionCards || checkedBoxes.map(cb => cb.closest('.song-row'));
     const cards = candidateCards.filter(card => card && !isLocalMusicSourceValue(card.dataset.source));
     const skippedLocalCount = candidateCards.length - cards.length;
     if (cards.length === 0) {
@@ -4482,7 +4527,7 @@ async function batchRemoveFromCollection(colId) {
 
 let pendingFavSong = null;
 let activeLocalMusicCollectionId = '';
-let localMusicModalState = {
+const localMusicModalState = {
     offset: 0,
     limit: 80,
     total: 0,
@@ -4792,7 +4837,7 @@ async function addLocalMusicToCollection(trackId, btn) {
 }
 
 function playAllSongs() {
-    const firstPlayBtn = document.querySelector('.song-card .btn-play');
+    const firstPlayBtn = document.querySelector('.song-row .icon-btn.play-btn');
     if (firstPlayBtn) {
         playAllAndJumpTo(firstPlayBtn);
     } else {
@@ -4990,11 +5035,11 @@ function refreshAddToCollectionList() {
 }
 
 function openAddToCollectionModal(btn) {
-    const card = btn.closest('.song-card');
+    const card = btn.closest('.song-row');
     if (!card) return;
     
     let coverUrl = card.dataset.cover || '';
-    const imgEl = card.querySelector('.cover-wrapper img');
+    const imgEl = card.querySelector('.song-art');
     if (imgEl && imgEl.src) coverUrl = imgEl.src;
 
     let extra = {};
@@ -5044,7 +5089,7 @@ function removeSongFromCollection(btn, colId, originalSongId, originalSource) {
         .then(r => r.json())
         .then(res => {
             if(res.error) return alert(res.error);
-            const card = btn.closest('.song-card');
+            const card = btn.closest('.song-row');
             if (card) {
                 card.style.transition = 'all 0.3s';
                 card.style.opacity = '0';

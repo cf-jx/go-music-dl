@@ -444,7 +444,7 @@ textarea {
 .song-row:hover {
 	background: var(--bg-hover);
 }
-.song-row.playing {
+.song-row.playing-active,
 	background: var(--accent-bg);
 	box-shadow: inset 3px 0 0 var(--accent);
 }
@@ -564,7 +564,7 @@ textarea {
 	transition: opacity var(--ease);
 }
 .song-row:hover .song-actions,
-.song-row.playing .song-actions {
+.song-row.playing-active .song-actions {
 	opacity: 1;
 }
 
