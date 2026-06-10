@@ -88,8 +88,11 @@
                 {{ else }}
                     {{ range $.DefaultSources }}{{ if eq . $source }}checked{{ end }}{{ end }}
                 {{ end }}>
-            <span class="source-chip-name">{{ $source }}</span>
-            <span class="source-chip-desc">{{ index $.SourceDescriptions $source }}</span>
+            <div class="source-chip-info">
+                <span class="source-chip-name">{{ $source }}</span>
+                <span class="source-chip-desc">{{ index $.SourceDescriptions $source }}</span>
+            </div>
+            <span class="setting-switch" aria-hidden="true"></span>
         </label>
         {{ end }}
     </div>

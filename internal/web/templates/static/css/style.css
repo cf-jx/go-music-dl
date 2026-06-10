@@ -2063,42 +2063,60 @@ body.batch-mode .song-row {
 }
 .source-grid {
 	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-	gap: 6px;
-	margin-top: 10px;
+	grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+	gap: 8px;
+	margin-top: 12px;
 }
 .source-chip {
 	display: flex;
-	flex-direction: column;
+	flex-direction: row;
 	align-items: center;
-	padding: 8px 6px;
-	border-radius: var(--r-sm);
+	justify-content: space-between;
+	padding: 10px 14px;
+	border-radius: var(--r-md);
 	border: 1px solid var(--border);
 	background: var(--bg-content);
 	cursor: pointer;
 	transition: all var(--ease);
-	gap: 2px;
+	gap: 12px;
+	position: relative;
 }
 .source-chip:hover {
 	border-color: var(--accent);
 }
-.source-chip.checked {
+.source-chip:has(input:checked) {
 	border-color: var(--accent);
 	background: var(--accent-bg);
 }
-.source-chip.checked .source-chip-name {
+.source-chip:has(input:checked) .source-chip-name {
 	color: var(--accent);
 }
 .source-chip input {
-	display: none;
+	opacity: 0;
+	width: 0;
+	height: 0;
+	position: absolute;
+}
+.source-chip-info {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 2px;
 }
 .source-chip-name {
-	font-size: 12px;
+	font-size: 13px;
 	font-weight: 600;
+	color: var(--text-primary);
 }
 .source-chip-desc {
-	font-size: 10px;
+	font-size: 11px;
 	color: var(--text-tertiary);
+}
+.source-chip input:checked + .setting-switch {
+	background: var(--green);
+}
+.source-chip input:checked + .setting-switch::before {
+	transform: translateX(18px);
 }
 
 /* ── 扫码登录弹窗 ── */
