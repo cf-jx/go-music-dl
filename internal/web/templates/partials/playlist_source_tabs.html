@@ -11,39 +11,39 @@
         </div>
     </header>
 
-    <div class="category-source-tabs" role="tablist">
+    <div class="category-tabs" role="tablist">
         {{ range $idx, $tab := $tabsData.Tabs }}
         <button type="button"
-            class="category-source-tab{{ if eq $idx 0 }} is-active{{ end }}"
+            class="category-tab{{ if eq $idx 0 }} active{{ end }}"
             role="tab"
             data-target="playlist-tabs-{{ $tabsData.ID }}-{{ $tab.Source }}"
             onclick="switchCategorySource(this)">
-            <span class="category-source-tab-name">{{ $tab.Name }}</span>
-            <span class="category-source-tab-count">{{ $tab.Count }}</span>
+            <span>{{ $tab.Name }}</span>
+            <span class="category-tab-count">{{ $tab.Count }}</span>
         </button>
         {{ end }}
     </div>
 
-    <div class="category-source-panels">
+    <div class="category-panels">
         {{ range $idx, $tab := $tabsData.Tabs }}
-        <div class="category-source-panel{{ if eq $idx 0 }} is-active{{ end }}"
+        <div class="{{ if eq $idx 0 }}active{{ end }}"
              id="playlist-tabs-{{ $tabsData.ID }}-{{ $tab.Source }}"
              role="tabpanel">
             {{ if $tab.Error }}
-            <div class="category-source-empty error"><i class="fa-solid fa-circle-exclamation"></i> {{ $tab.Error }}</div>
+            <div class="empty-state error"><i class="fa-solid fa-circle-exclamation"></i> {{ $tab.Error }}</div>
             {{ else if not $tab.Playlists }}
-            <div class="category-source-empty"><i class="fa-regular fa-folder-open"></i> {{ $tabsData.Empty }}</div>
+            <div class="empty-state"><i class="fa-regular fa-folder-open"></i> {{ $tabsData.Empty }}</div>
             {{ else }}
-            <div class="playlist-tabs-grid">
+            <div class="playlist-grid">
                 {{ range $tab.Playlists }}
                 {{ $detailURL := playlistDetailURL $root "playlist" . }}
                 <div class="playlist-card" onclick="navigateTo('{{ $detailURL }}')">
-                    <div class="playlist-cover">
+                    <div class="playlist-card-cover">
                         <img src="{{ .Cover }}" loading="lazy" onerror="this.src='https://via.placeholder.com/400?text=Cover'">
                         <span class="tag tag-src" style="position:absolute; top:5px; right:5px; margin:0; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">{{ .Source }}</span>
                     </div>
-                    <div class="playlist-meta">
-                        <div class="playlist-title">
+                    <div class="playlist-card-body">
+                        <div class="playlist-card-title">
                             {{ .Name }}
                             {{ if .Link }}
                             <a href="{{ .Link }}" target="_blank" class="external-link-icon" title="打开原始页面" onclick="event.stopPropagation()">
@@ -51,9 +51,9 @@
                             </a>
                             {{ end }}
                         </div>
-                        {{ if .Creator }}<div class="playlist-author"><i class="fa-regular fa-user"></i> {{ .Creator }}</div>{{ end }}
-                        <div class="playlist-card-actions">
-                            <div class="playlist-count">{{ if gt .TrackCount 0 }}共 {{ .TrackCount }} 首{{ else }}进入查看{{ end }}</div>
+                        {{ if .Creator }}<div class="playlist-card-sub"><i class="fa-regular fa-user"></i> {{ .Creator }}</div>{{ end }}
+                        <div class="playlist-card-footer">
+                            <div class="playlist-card-count">{{ if gt .TrackCount 0 }}共 {{ .TrackCount }} 首{{ else }}进入查看{{ end }}</div>
                             <button type="button"
                                     class="ctrl-btn primary"
                                     title="导入到本地歌单列表，保存为外部导入歌单；仅保留元数据，不保存具体歌曲明细。"

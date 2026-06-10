@@ -1200,11 +1200,11 @@ function switchCategorySource(tab) {
     const panelId = tab.getAttribute('data-target');
     if (!panelId) return;
     const scope = tab.closest('.category-panel') || document;
-    scope.querySelectorAll('.category-source-tab').forEach((t) => {
-        t.classList.toggle('is-active', t === tab);
+    scope.querySelectorAll('.category-tab').forEach((t) => {
+        t.classList.toggle('active', t === tab);
     });
-    scope.querySelectorAll('.category-source-panel').forEach((p) => {
-        p.classList.toggle('is-active', p.id === panelId);
+    scope.querySelectorAll('.category-panels > div').forEach((p) => {
+        p.classList.toggle('active', p.id === panelId);
     });
 }
 
@@ -1455,15 +1455,19 @@ function renderLocalMusicPageCard(track) {
     const album = song.album || '';
     const cover = song.cover || '';
     const coverHTML = cover
-        ? `<img class="song-art" src="${escapeHTML(cover)}" alt="${escapeHTML(song.name)}" loading="lazy" onerror="this.src='https://via.placeholder.com/150?text=Music'">`
-        : `<div class="song-art-placeholder" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:24px;">♪</div>`;
+        ? `<img class="song-art" src="${escapeHTML(cover)}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='<div class=&quot;song-art-placeholder&quot;><i class=&quot;fa-solid fa-music&quot;></i></div>'">`
+        : `<div class="song-art-placeholder"><i class="fa-solid fa-music"></i></div>`;
 
     const lyricButton = song.extra && song.extra.lyric
-        ? `<a href="${escapeHTML(lyricURLsForSong({ ...song, extra: extraJSON }).download)}" id="lrc-${escapeHTML(song.id)}" class="icon-btn" title="下载歌词" target="_blank"><i class="fa-solid fa-file-lines"></i></a>`
+        ? `<a href="${escapeHTML(lyricURLsForSong({ ...song, extra: extraJSON }).download)}" id="lrc-${escapeHTML(song.id)}" class="btn-circle btn-dl btn-lyric" title="下载歌词" target="_blank"><i class="fa-solid fa-file-lines"></i></a>`
         : '';
     const coverButton = cover
-        ? `<a href="${escapeHTML(buildCoverDownloadURL({ ...song, extra: extraJSON }))}" class="icon-btn" title="下载封面" target="_blank"><i class="fa-regular fa-image"></i></a>`
+        ? `<a href="${escapeHTML(buildCoverDownloadURL({ ...song, extra: extraJSON }))}" class="btn-circle btn-dl btn-cover" title="下载封面" target="_blank"><i class="fa-regular fa-image"></i></a>`
         : '';
+
+    const sizeText = escapeHTML(track?.size_text || '');
+    const bitrateText = track?.extra?.bitrate ? escapeHTML(track.extra.bitrate) + ' kbps' : '';
+    const infoMeta = [sizeText, bitrateText].filter(Boolean).join(' · ');
 
     return `
         <li class="song-row"
@@ -1480,32 +1484,46 @@ function renderLocalMusicPageCard(track) {
             data-rel-path="${escapeHTML(track?.rel_path || '')}"
             oncontextmenu="showSongRowContextMenu(event, this)"
             data-extra='${escapeHTML(extraJSON)}'>
-            <div class="checkbox-wrapper">
+            
+            <div class="checkbox-wrapper" style="width:22px;">
                 <input type="checkbox" class="song-checkbox" onclick="event.stopPropagation(); updateBatchToolbar();">
             </div>
-            <div class="song-col song-col--art">${coverHTML}</div>
-            <div class="song-info">
-                <h3>${escapeHTML(song.name)}</h3>
-                <div class="artist-line">${renderArtistLineHTML(song)}</div>
-                <div class="tags">
-                    <span class="tag tag-local">本地</span>
-                    <span class="tag tag-duration">${formatDuration(song.duration)}</span>
-                    <span class="tag tag-success" id="size-${escapeHTML(song.id)}">${escapeHTML(track?.size_text || '')}</span>
-                    <span class="tag" id="bitrate-${escapeHTML(song.id)}">${track?.extra?.bitrate ? escapeHTML(track.extra.bitrate) + ' kbps' : '-'}</span>
+            
+            <div class="song-col song-col--art">
+                ${coverHTML}
+                <div class="song-art-overlay" onclick="playAllAndJumpTo(this.closest('.song-row'))">
+                    <i class="fa-solid fa-play"></i>
                 </div>
             </div>
-            <div class="actions">
-                <button type="button" class="icon-btn play-btn" title="播放" onclick="playAllAndJumpTo(this)">
-                    <i class="fa-solid fa-play"></i>
-                </button>
-                <button type="button" class="icon-btn" title="收藏到自制歌单" onclick="openAddToCollectionModal(this)">
-                    <i class="fa-regular fa-heart"></i>
-                </button>
-                ${lyricButton}
-                ${coverButton}
-                <button type="button" class="icon-btn danger" title="删除本地音乐" onclick="deleteLocalMusicFromButton(this)">
-                    <i class="fa-solid fa-trash"></i>
-                </button>
+            
+            <div class="song-col song-col--info">
+                <div class="song-name">${escapeHTML(song.name)}</div>
+                <div class="song-artist">${renderArtistLineHTML(song)}</div>
+            </div>
+            
+            <div class="song-col song-col--meta">
+                <span class="song-duration" title="时长">${formatDuration(song.duration)}</span>
+            </div>
+            
+            <div class="song-col song-col--source">
+                <span class="tag tag-local">本地</span>
+                <span class="tag-loading" id="size-${escapeHTML(song.id)}" style="font-size:10px;color:var(--text-tertiary);margin-left:4px;">${infoMeta}</span>
+            </div>
+            
+            <div class="song-col song-col--actions">
+                <div class="song-actions">
+                    <button type="button" class="btn-circle btn-play" title="播放" onclick="playAllAndJumpTo(this)">
+                        <i class="fa-solid fa-play"></i>
+                    </button>
+                    <button type="button" class="btn-circle btn-fav" title="收藏" onclick="openAddToCollectionModal(this)">
+                        <i class="fa-regular fa-heart"></i>
+                    </button>
+                    ${lyricButton}
+                    ${coverButton}
+                    <button type="button" class="btn-circle btn-delete-local danger" title="删除" onclick="deleteLocalMusicFromButton(this)">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
             </div>
         </li>
     `;

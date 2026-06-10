@@ -23,22 +23,22 @@
         </div>
     </header>
 
-    <div class="category-source-tabs" role="tablist">
+    <div class="category-tabs" role="tablist">
         {{ range $idx, $src := .PlaylistCategorySources }}
         <button type="button"
-            class="category-source-tab{{ if eq $idx 0 }} is-active{{ end }}"
+            class="category-tab{{ if eq $idx 0 }} active{{ end }}"
             role="tab"
             data-target="category-panel-{{ $src.Source }}"
             onclick="switchCategorySource(this)">
-            <span class="category-source-tab-name">{{ $src.Name }}</span>
-            <span class="category-source-tab-count">{{ $src.Count }}</span>
+            <span>{{ $src.Name }}</span>
+            <span class="category-tab-count">{{ $src.Count }}</span>
         </button>
         {{ end }}
     </div>
 
-    <div class="category-source-panels">
+    <div class="category-panels">
         {{ range $idx, $src := .PlaylistCategorySources }}
-        <div class="category-source-panel{{ if eq $idx 0 }} is-active{{ end }}" id="category-panel-{{ $src.Source }}" role="tabpanel">
+        <div class="{{ if eq $idx 0 }}active{{ end }}" id="category-panel-{{ $src.Source }}" role="tabpanel">
             {{ range $src.Groups }}
             <div class="category-group">
                 <div class="category-group-title"><span>{{ .Name }}</span></div>

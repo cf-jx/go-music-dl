@@ -22,7 +22,7 @@
             {{ end }}
         </div>
     </div>
-    <div class="playlist-grid-container">
+    <div class="playlist-grid">
         {{ range .Playlists }}
         {{ $detailURL := playlistDetailURL $.Root $.SearchType . }}
         {{ $collectionKind := playlistExtraValue . "collection_kind" }}
@@ -30,7 +30,7 @@
         {{ $remoteSource := playlistExtraValue . "remote_source" }}
         {{ $editable := playlistExtraValue . "editable" }}
         <div class="playlist-card" onclick="navigateTo('{{ $detailURL }}')">
-            <div class="playlist-cover" onclick="event.stopPropagation(); navigateTo('{{ $detailURL }}')">
+            <div class="playlist-card-cover" onclick="event.stopPropagation(); navigateTo('{{ $detailURL }}')">
                 <img src="{{ .Cover }}" loading="lazy" onerror="this.src='https://via.placeholder.com/400?text=Cover'">
                 <span class="tag {{ if eq .Source "local" }}tag-local{{ else }}tag-src{{ end }}" style="position:absolute; top:5px; right:5px; margin:0; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
                     {{ if eq .Source "local" }}
@@ -40,8 +40,8 @@
                     {{ end }}
                 </span>
             </div>
-            <div class="playlist-meta">
-                <div class="playlist-title" onclick="event.stopPropagation(); navigateTo('{{ $detailURL }}')">
+            <div class="playlist-card-body">
+                <div class="playlist-card-title" onclick="event.stopPropagation(); navigateTo('{{ $detailURL }}')">
                     {{ .Name }}
                     {{ if .Link }}
                     <a href="{{ .Link }}" target="_blank" class="external-link-icon" title="打开原始页面" onclick="event.stopPropagation()">
@@ -49,16 +49,16 @@
                     </a>
                     {{ end }}
                 </div>
-                <div class="playlist-author"><i class="fa-regular fa-user"></i> {{ .Creator }}</div>
+                <div class="playlist-card-sub"><i class="fa-regular fa-user"></i> {{ .Creator }}</div>
                 {{ if and (eq .Source "local") (eq $collectionKind "imported") }}
-                <div class="playlist-author">
+                <div class="playlist-card-sub">
                     <i class="fa-solid {{ if eq $contentType "album" }}fa-compact-disc{{ else }}fa-list{{ end }}"></i>
                     {{ if eq $contentType "album" }}导入专辑{{ else }}导入歌单{{ end }}{{ if $remoteSource }} · {{ $remoteSource }}{{ end }}
                 </div>
                 {{ end }}
 
-                <div class="playlist-card-actions">
-                    <div class="playlist-count">共 {{ .TrackCount }} 首</div>
+                <div class="playlist-card-footer">
+                    <div class="playlist-card-count">共 {{ .TrackCount }} 首</div>
 
                     {{ if eq .Source "local" }}
                     <div style="display:flex; gap:6px;">
