@@ -8,8 +8,10 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -1033,6 +1035,105 @@ func RegisterMusicRoutes(api *gin.RouterGroup) {
 	}
 	api.GET("/download_cover", downloadCoverHandler)
 	api.POST("/download_cover", downloadCoverHandler)
+
+	api.GET("/reveal", func(c *gin.Context) {
+		if !allowSaveLocalRequest(c) {
+			return
+		}
+		settings := core.GetWebSettings()
+		downloadDir := filepath.Clean(strings.TrimSpace(settings.DownloadDir))
+		if downloadDir == "" {
+			downloadDir = filepath.Clean(core.DefaultWebDownloadDir)
+		}
+
+		filePath := strings.TrimSpace(c.Query("path"))
+		if filePath == "" {
+			filePath = downloadDir
+		}
+		filePath = filepath.Clean(filePath)
+
+		// Security: only allow revealing files under the download directory
+		absFile, _ := filepath.Abs(filePath)
+		absDir, _ := filepath.Abs(downloadDir)
+		if !strings.HasPrefix(absFile, absDir) {
+			c.JSON(403, gin.H{"error": "path not allowed"})
+			return
+		}
+
+		var cmd *exec.Cmd
+		info, err := os.Stat(filePath)
+		if err != nil {
+			// File doesn't exist, try to open the download directory
+			filePath = downloadDir
+			info, err = os.Stat(filePath)
+			if err != nil {
+				c.JSON(404, gin.H{"error": "path not found"})
+				return
+			}
+		}
+
+		if info.IsDir() {
+			switch runtime.GOOS {
+			case "darwin":
+				cmd = exec.Command("open", filePath)
+			case "windows":
+				cmd = exec.Command("explorer", filePath)
+			default:
+				cmd = exec.Command("xdg-open", filePath)
+			}
+		} else {
+			switch runtime.GOOS {
+			case "darwin":
+				cmd = exec.Command("open", "-R", filePath)
+			case "windows":
+				cmd = exec.Command("explorer", "/select,", filePath)
+			default:
+				cmd = exec.Command("xdg-open", filepath.Dir(filePath))
+			}
+		}
+
+		if startErr := cmd.Start(); startErr != nil {
+			c.JSON(500, gin.H{"error": startErr.Error()})
+			return
+		}
+		go cmd.Wait()
+		c.JSON(200, gin.H{"status": "ok"})
+	})
+
+	api.POST("/delete_file", func(c *gin.Context) {
+		if !allowSaveLocalRequest(c) {
+			return
+		}
+		filePath := strings.TrimSpace(c.Query("path"))
+		if filePath == "" {
+			c.JSON(400, gin.H{"error": "missing path"})
+			return
+		}
+		filePath = filepath.Clean(filePath)
+
+		// Security: only allow deleting files under the download directory
+		settings := core.GetWebSettings()
+		downloadDir := filepath.Clean(strings.TrimSpace(settings.DownloadDir))
+		if downloadDir == "" {
+			downloadDir = filepath.Clean(core.DefaultWebDownloadDir)
+		}
+		absFile, _ := filepath.Abs(filePath)
+		absDir, _ := filepath.Abs(downloadDir)
+		if !strings.HasPrefix(absFile, absDir) || absFile == absDir {
+			c.JSON(403, gin.H{"error": "path not allowed"})
+			return
+		}
+
+		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+			c.JSON(200, gin.H{"status": "ok", "message": "file already deleted"})
+			return
+		}
+		if err := os.Remove(filePath); err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(200, gin.H{"status": "ok"})
+	})
 
 	api.GET("/cover_proxy", func(c *gin.Context) {
 		u := strings.TrimSpace(c.Query("url"))

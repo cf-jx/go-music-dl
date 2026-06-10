@@ -1893,6 +1893,100 @@ body.batch-mode .song-row {
 	color: var(--red);
 	border-color: var(--red);
 }
+.downloads-open-folder-btn {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 14px;
+	border: 1px solid var(--border);
+	border-radius: var(--r-md);
+	background: var(--bg-input);
+	color: var(--text-secondary);
+	font-size: 13px;
+	cursor: pointer;
+	transition: all var(--ease);
+}
+.downloads-open-folder-btn:hover {
+	background: var(--accent-bg);
+	color: var(--accent);
+	border-color: var(--accent);
+}
+.download-reveal-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	border: 1px solid var(--border);
+	border-radius: var(--r-sm);
+	background: transparent;
+	color: var(--text-tertiary);
+	font-size: 12px;
+	cursor: pointer;
+	transition: all var(--ease);
+	margin-top: 2px;
+}
+.download-reveal-btn:hover {
+	background: var(--accent-bg);
+	color: var(--accent);
+	border-color: var(--accent);
+}
+
+/* ── Download context menu ── */
+.download-context-menu {
+	position: fixed;
+	z-index: 9999;
+	min-width: 180px;
+	padding: 6px;
+	border-radius: var(--r-md);
+	background: var(--bg-modal);
+	backdrop-filter: blur(40px);
+	-webkit-backdrop-filter: blur(40px);
+	border: 1px solid var(--border);
+	box-shadow: var(--shadow-lg);
+	animation: toastIn 0.12s ease;
+}
+.download-context-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 8px 12px;
+	border: none;
+	border-radius: var(--r-sm);
+	background: transparent;
+	color: var(--text-primary);
+	font-size: 13px;
+	cursor: pointer;
+	transition: all var(--ease);
+	text-align: left;
+}
+.download-context-item:hover {
+	background: var(--bg-hover);
+	color: var(--accent);
+}
+.download-context-item i {
+	width: 16px;
+	text-align: center;
+	color: var(--text-tertiary);
+}
+.download-context-item:hover i {
+	color: var(--accent);
+}
+.download-context-divider {
+	height: 1px;
+	background: var(--border);
+	margin: 4px 8px;
+}
+.download-context-item.danger {
+	color: var(--red);
+}
+.download-context-item.danger i {
+	color: var(--red);
+}
+.download-context-item.danger:hover {
+	background: var(--red-bg);
+}
 
 /* ── Spotify-like resolved note ── */
 .resolved-note {

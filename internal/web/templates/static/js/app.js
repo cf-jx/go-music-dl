@@ -5255,6 +5255,18 @@ const DownloadManager = {
         this.refreshPagesIfActive();
     },
 
+    removeRecord(id) {
+        this.completed = this.completed.filter(item => item.id !== id);
+        this.save();
+        this.refreshPagesIfActive();
+    },
+
+    removeRecordByPath(path) {
+        this.completed = this.completed.filter(item => item.path !== path);
+        this.save();
+        this.refreshPagesIfActive();
+    },
+
     clearHistory() {
         this.completed = [];
         this.save();
@@ -5331,7 +5343,7 @@ function showDownloadsPage(options = {}) {
                 </div>
                 <div class="download-list">
                     ${completed.map((item, idx) => `
-                        <div class="download-item card ${item.status}">
+                        <div class="download-item card ${item.status}" data-id="${escapeHTML(item.id)}" data-path="${escapeHTML(item.path || '')}" oncontextmenu="showDownloadContextMenu(event, this)">
                             <img class="download-item-art" src="${item.cover || '/icon.png'}" onerror="this.src='/icon.png'">
                             <div class="download-item-info">
                                 <div class="download-item-title">${escapeHTML(item.name)}</div>
@@ -5346,6 +5358,11 @@ function showDownloadsPage(options = {}) {
                                         : `<span class="status-failed" title="${escapeHTML(item.error || '未知错误')}"><i class="fa-solid fa-circle-xmark"></i> 失败</span>`
                                     }
                                 </div>
+                                ${item.status === 'success' && item.path ? `
+                                    <button class="download-reveal-btn" onclick="event.stopPropagation(); revealInFolder('${escapeHTML(item.path)}')" title="在文件管理器中显示">
+                                        <i class="fa-solid fa-folder-open"></i>
+                                    </button>
+                                ` : ''}
                             </div>
                         </div>
                     `).reverse().join('')}
@@ -5367,8 +5384,11 @@ function showDownloadsPage(options = {}) {
     }
 
     container.innerHTML = `
-        <div class="content-header">
+        <div class="content-header" style="display:flex;align-items:center;justify-content:space-between;">
             <h1 class="page-title">下载</h1>
+            <button class="downloads-open-folder-btn" onclick="openDownloadFolder()" title="打开下载文件夹">
+                <i class="fa-solid fa-folder-open"></i> 打开文件夹
+            </button>
         </div>
         <div class="download-page-content">
             ${downloadingHtml}
@@ -5378,6 +5398,146 @@ function showDownloadsPage(options = {}) {
     `;
 }
 window.showDownloadsPage = showDownloadsPage;
+
+async function revealInFolder(filePath) {
+    try {
+        const response = await fetch(`${API_ROOT}/reveal?path=${encodeURIComponent(filePath)}`);
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            showToast('打开失败', data.error || '无法打开文件位置', 'error');
+        }
+    } catch (error) {
+        showToast('打开失败', error.message || '无法打开文件位置', 'error');
+    }
+}
+window.revealInFolder = revealInFolder;
+
+async function openDownloadFolder() {
+    try {
+        const response = await fetch(`${API_ROOT}/reveal`);
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            showToast('打开失败', data.error || '无法打开下载文件夹', 'error');
+        }
+    } catch (error) {
+        showToast('打开失败', error.message || '无法打开下载文件夹', 'error');
+    }
+}
+window.openDownloadFolder = openDownloadFolder;
+
+function showDownloadContextMenu(event, itemEl) {
+    event.preventDefault();
+    const filePath = itemEl?.dataset?.path;
+    const itemId = itemEl?.dataset?.id;
+    if (!filePath && !itemId) return;
+
+    // Remove any existing context menu
+    document.querySelectorAll('.download-context-menu').forEach(m => m.remove());
+
+    const menu = document.createElement('div');
+    menu.className = 'download-context-menu';
+
+    let menuItems = '';
+    if (filePath) {
+        menuItems += `
+            <button class="download-context-item" data-action="reveal">
+                <i class="fa-solid fa-folder-open"></i> 在文件管理器中显示
+            </button>
+            <button class="download-context-item" data-action="copy-path">
+                <i class="fa-solid fa-copy"></i> 复制文件路径
+            </button>
+            <div class="download-context-divider"></div>
+        `;
+    }
+    menuItems += `
+        <button class="download-context-item" data-action="remove-record">
+            <i class="fa-solid fa-xmark"></i> 移除记录
+        </button>
+    `;
+    if (filePath) {
+        menuItems += `
+            <button class="download-context-item danger" data-action="delete-file">
+                <i class="fa-solid fa-trash"></i> 删除本地文件
+            </button>
+        `;
+    }
+    menu.innerHTML = menuItems;
+    menu.style.left = `${event.clientX}px`;
+    menu.style.top = `${event.clientY}px`;
+    document.body.appendChild(menu);
+
+    // Adjust if overflows viewport
+    const rect = menu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) {
+        menu.style.left = `${window.innerWidth - rect.width - 8}px`;
+    }
+    if (rect.bottom > window.innerHeight) {
+        menu.style.top = `${window.innerHeight - rect.height - 8}px`;
+    }
+
+    menu.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-action]');
+        if (!btn) return;
+        const action = btn.dataset.action;
+        if (action === 'reveal') {
+            revealInFolder(filePath);
+        } else if (action === 'copy-path') {
+            navigator.clipboard.writeText(filePath).then(() => {
+                showToast('已复制', filePath, 'success', 2000);
+            }).catch(() => {
+                showToast('复制失败', '浏览器不支持剪贴板操作', 'error');
+            });
+        } else if (action === 'remove-record') {
+            if (itemId) {
+                DownloadManager.removeRecord(itemId);
+                showToast('已移除', '下载记录已移除', 'success', 2000);
+            } else if (filePath) {
+                DownloadManager.removeRecordByPath(filePath);
+                showToast('已移除', '下载记录已移除', 'success', 2000);
+            }
+        } else if (action === 'delete-file') {
+            deleteDownloadFile(filePath, itemId);
+        }
+        menu.remove();
+    });
+
+    const dismissMenu = (e) => {
+        if (!menu.contains(e.target)) {
+            menu.remove();
+            document.removeEventListener('click', dismissMenu);
+            document.removeEventListener('contextmenu', dismissMenu);
+        }
+    };
+    setTimeout(() => {
+        document.addEventListener('click', dismissMenu);
+        document.addEventListener('contextmenu', dismissMenu);
+    }, 0);
+}
+window.showDownloadContextMenu = showDownloadContextMenu;
+
+async function deleteDownloadFile(filePath, itemId) {
+    if (!filePath) return;
+    if (!confirm(`确定要删除本地文件吗？\n${filePath}`)) return;
+
+    try {
+        const response = await fetch(`${API_ROOT}/delete_file?path=${encodeURIComponent(filePath)}`, { method: 'POST' });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            showToast('删除失败', data.error || '无法删除文件', 'error');
+            return;
+        }
+        // Also remove the record
+        if (itemId) {
+            DownloadManager.removeRecord(itemId);
+        } else {
+            DownloadManager.removeRecordByPath(filePath);
+        }
+        showToast('已删除', '文件和记录已删除', 'success', 2000);
+    } catch (error) {
+        showToast('删除失败', error.message || '无法删除文件', 'error');
+    }
+}
+window.deleteDownloadFile = deleteDownloadFile;
 
 function clearDownloadHistory() {
     if (confirm('确定要清空全部已下载历史记录吗？')) {
