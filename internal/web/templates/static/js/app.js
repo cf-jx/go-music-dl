@@ -2,7 +2,10 @@
 
 const API_ROOT = window.API_ROOT;
 const WEB_SETTINGS_KEY = 'musicdl:web_settings';
-const INSPECT_REQUEST_DELAY_MS = 100;
+const INSPECT_REQUEST_DELAY_MS = 30;
+let inspectTimers = [];
+let inspectAbortControllers = [];
+let inspectSortDebounceTimer = null;
 const AUTO_SWITCH_INVALID_DELAY_MS = 500;
 const DEFAULT_WEB_PAGE_SIZE = 30;
 const DEFAULT_CLI_PAGE_SIZE = 20;
@@ -38,7 +41,7 @@ let webSettings = {
     downloadToLocal: true,
     downloadDir: 'data/downloads',
     downloadFilenameTemplate: '{name} - {artist}',
-    disableFloatingLyrics: false,
+    disableFloatingLyrics: true,
     webPageSize: DEFAULT_WEB_PAGE_SIZE,
     cliPageSize: DEFAULT_CLI_PAGE_SIZE,
     autoCheckUpdate: true,
@@ -58,7 +61,7 @@ function normalizeWebSettings(raw) {
         downloadToLocal: true,
         downloadDir: 'data/downloads',
         downloadFilenameTemplate: '{name} - {artist}',
-        disableFloatingLyrics: false,
+        disableFloatingLyrics: true,
         webPageSize: DEFAULT_WEB_PAGE_SIZE,
         cliPageSize: DEFAULT_CLI_PAGE_SIZE,
         autoCheckUpdate: true,
@@ -162,6 +165,7 @@ function floatingLyricsEnabled() {
 
 function syncFloatingLyricsSetting() {
     document.body.classList.toggle('floating-lyrics-disabled', !floatingLyricsEnabled());
+    updateLyricButtonActiveState();
     if (!window.KaraokeLyrics) return;
     if (!floatingLyricsEnabled()) {
         window.KaraokeLyrics.hide();
@@ -839,7 +843,19 @@ function bindSongCardCovers(root = document) {
     });
 }
 
+function cancelPendingInspects() {
+    inspectTimers.forEach(t => clearTimeout(t));
+    inspectTimers = [];
+    inspectAbortControllers.forEach(c => c.abort());
+    inspectAbortControllers = [];
+    if (inspectSortDebounceTimer) {
+        clearTimeout(inspectSortDebounceTimer);
+        inspectSortDebounceTimer = null;
+    }
+}
+
 function initializePageContent(root = document) {
+    cancelPendingInspects();
     resetAutoSwitchInvalidState();
     bindSourceSelectorButtons(root);
     initSourceSelectorCollapse(root);
@@ -851,9 +867,13 @@ function initializePageContent(root = document) {
         toggleSearchType(initialTypeEl.value);
     }
 
+    // Batch DOM operations: iterate .song-row once for multiple tasks
+    const songRows = root.querySelectorAll('.song-row');
     refreshDownloadLinks(root);
     bindSongCardCovers(root);
     updateBatchToolbar();
+
+    // These iterate .song-row but are lightweight
     highlightCard(currentPlayingId);
     syncAllPlayButtons();
     syncMediaSession();
@@ -917,6 +937,14 @@ async function navigateTo(url, options = {}) {
     const controller = new AbortController();
     navigationAbortController = controller;
 
+    // Show loading state immediately for instant feedback
+    const currentContainer = document.querySelector('.container');
+    if (currentContainer) {
+        currentContainer.style.opacity = '0.5';
+        currentContainer.style.pointerEvents = 'none';
+        currentContainer.style.transition = 'opacity 0.1s';
+    }
+
     try {
         const response = await fetch(targetURL.toString(), {
             headers: {
@@ -939,6 +967,10 @@ async function navigateTo(url, options = {}) {
         }
 
         currentContainer.innerHTML = nextContainer.innerHTML;
+        // Reset loading state
+        currentContainer.style.opacity = '';
+        currentContainer.style.pointerEvents = '';
+        currentContainer.style.transition = '';
         defaultDocumentTitle = nextDoc.title || defaultDocumentTitle;
         document.title = defaultDocumentTitle;
 
@@ -969,6 +1001,13 @@ async function navigateTo(url, options = {}) {
     } finally {
         if (navigationAbortController === controller) {
             navigationAbortController = null;
+        }
+        // Ensure loading state is cleared even on error
+        const c = document.querySelector('.container');
+        if (c) {
+            c.style.opacity = '';
+            c.style.pointerEvents = '';
+            c.style.transition = '';
         }
     }
 }
@@ -1418,6 +1457,8 @@ function renderLocalMusicPageCard(track) {
             data-cover="${escapeHTML(cover)}"
             data-sort-size="${parsePositiveInt(track?.size, 0)}"
             data-sort-bitrate="${parsePositiveInt(song.extra?.bitrate, 0)}"
+            data-rel-path="${escapeHTML(track?.rel_path || '')}"
+            oncontextmenu="showSongRowContextMenu(event, this)"
             data-extra='${escapeHTML(extraJSON)}'>
             <div class="checkbox-wrapper">
                 <input type="checkbox" class="song-checkbox" onclick="event.stopPropagation(); updateBatchToolbar();">
@@ -1429,8 +1470,8 @@ function renderLocalMusicPageCard(track) {
                 <div class="tags">
                     <span class="tag tag-local">本地</span>
                     <span class="tag tag-duration">${formatDuration(song.duration)}</span>
-                    <span class="tag tag-loading" id="size-${escapeHTML(song.id)}"><i class="fa fa-spinner fa-spin"></i></span>
-                    <span class="tag tag-loading" id="bitrate-${escapeHTML(song.id)}"><i class="fa fa-circle-notch fa-spin"></i></span>
+                    <span class="tag tag-success" id="size-${escapeHTML(song.id)}">${escapeHTML(track?.size_text || '')}</span>
+                    <span class="tag" id="bitrate-${escapeHTML(song.id)}">${track?.extra?.bitrate ? escapeHTML(track.extra.bitrate) + ' kbps' : '-'}</span>
                 </div>
             </div>
             <div class="actions">
@@ -1632,9 +1673,13 @@ function inspectSong(card) {
         params.set('extra', extra);
     }
 
-    fetch(`${API_ROOT}/inspect?${params.toString()}`)
+    const controller = new AbortController();
+    inspectAbortControllers.push(controller);
+
+    fetch(`${API_ROOT}/inspect?${params.toString()}`, { signal: controller.signal })
         .then(r => r.json())
         .then(data => {
+            inspectAbortControllers = inspectAbortControllers.filter(c => c !== controller);
             if (data && data.song && typeof data.song === 'object') {
                 updateCardWithSong(card, data.song, { inspect: false });
             }
@@ -1670,16 +1715,24 @@ function inspectSong(card) {
                 card.dataset.sortBitrate = "0";
             }
             if (songSortMode !== 'default') {
-                applySongSort();
+                // Debounce sort: wait until inspect batch settles
+                if (inspectSortDebounceTimer) clearTimeout(inspectSortDebounceTimer);
+                inspectSortDebounceTimer = setTimeout(() => {
+                    applySongSort();
+                    inspectSortDebounceTimer = null;
+                }, 200);
             }
         })
-        .catch(() => {
+        .catch(error => {
+            if (error && error.name === 'AbortError') return;
+            inspectAbortControllers = inspectAbortControllers.filter(c => c !== controller);
             const el = document.getElementById(`size-${id}`);
             if (el) el.textContent = '检测失败';
         })
         .finally(() => {
             delete card.dataset.inspectPending;
-            if (document.querySelector('.tag-fail')) {
+            // Only schedule auto-switch once all inspects are done
+            if (!document.querySelector('[data-inspect-pending]') && document.querySelector('.tag-fail')) {
                 scheduleAutoSwitchInvalidSources();
             }
         });
@@ -1687,8 +1740,12 @@ function inspectSong(card) {
 
 function queueInspectSong(card, delay = INSPECT_REQUEST_DELAY_MS) {
     if (!card) return;
+    if (isLocalMusicSourceValue(card.dataset.source)) {
+        return; // Local songs do not need online inspection!
+    }
     card.dataset.inspectPending = '1';
-    window.setTimeout(() => inspectSong(card), delay);
+    const timerId = window.setTimeout(() => inspectSong(card), delay);
+    inspectTimers.push(timerId);
 }
 
 const QR_LOGIN_SOURCE_LABELS = {
@@ -3515,6 +3572,7 @@ ap.on('listswitch', (e) => {
             }
         }
     }
+    syncPlayerBar(newAudio || getCurrentAPlayerAudio());
     syncMediaSession(newAudio || getCurrentAPlayerAudio());
     scheduleMediaSessionSync(newAudio || getCurrentAPlayerAudio(), 180);
     KaraokeLyrics.load(newAudio || getCurrentAPlayerAudio());
@@ -3529,6 +3587,7 @@ ap.on('play', () => {
         highlightCard(currentPlayingId);
     }
     syncAllPlayButtons();
+    syncPlayerBar(audio || getCurrentAPlayerAudio());
     syncMediaSession(audio || getCurrentAPlayerAudio());
     scheduleMediaSessionSync(audio || getCurrentAPlayerAudio(), 180);
     KaraokeLyrics.load(audio || getCurrentAPlayerAudio());
@@ -5423,7 +5482,166 @@ async function openDownloadFolder() {
         showToast('打开失败', error.message || '无法打开下载文件夹', 'error');
     }
 }
-window.openDownloadFolder = openDownloadFolder;
+function updateLyricButtonActiveState() {
+    const btn = document.getElementById('player-lyric-btn');
+    if (btn) {
+        btn.classList.toggle('active', floatingLyricsEnabled());
+    }
+}
+window.updateLyricButtonActiveState = updateLyricButtonActiveState;
+
+function toggleFloatingLyrics() {
+    webSettings.disableFloatingLyrics = !webSettings.disableFloatingLyrics;
+    persistWebSettingsCache();
+    // Update settings modal checkbox if it exists
+    const toggle = document.getElementById('setting-floating-lyrics');
+    if (toggle) toggle.checked = !webSettings.disableFloatingLyrics;
+    updateLyricButtonActiveState();
+    syncFloatingLyricsSetting();
+}
+window.toggleFloatingLyrics = toggleFloatingLyrics;
+
+async function deleteLocalMusicDirect(id, name, artist) {
+    const song = { id, name, artist };
+    if (!confirmLocalMusicDeletion([song])) return;
+    try {
+        await deleteLocalMusic(id);
+        stopDeletedLocalMusicPlayback(new Set([id]));
+        await refreshCurrentPageContent({ scroll: false });
+    } catch (error) {
+        alert(error.message || '删除失败');
+    }
+}
+window.deleteLocalMusicDirect = deleteLocalMusicDirect;
+
+function showSongRowContextMenu(event, itemEl) {
+    event.preventDefault();
+    const id = itemEl.dataset.id;
+    const source = itemEl.dataset.source;
+    const isLocal = isLocalMusicSourceValue(source);
+    const relPath = itemEl.dataset.relPath || '';
+    const name = itemEl.dataset.name || '';
+    const artist = itemEl.dataset.artist || '';
+
+    // Remove any existing context menu
+    document.querySelectorAll('.download-context-menu').forEach(m => m.remove());
+
+    const menu = document.createElement('div');
+    menu.className = 'download-context-menu';
+
+    let menuItems = `
+        <button class="download-context-item" data-action="play">
+            <i class="fa-solid fa-play"></i> 播放
+        </button>
+        <button class="download-context-item" data-action="add-playlist">
+            <i class="fa-solid fa-heart"></i> 添加到自制歌单
+        </button>
+        <div class="download-context-divider"></div>
+    `;
+
+    if (isLocal) {
+        menuItems += `
+            <button class="download-context-item" data-action="reveal">
+                <i class="fa-solid fa-folder-open"></i> 在文件管理器中显示
+            </button>
+            <button class="download-context-item" data-action="copy-path">
+                <i class="fa-solid fa-copy"></i> 复制文件路径
+            </button>
+            <div class="download-context-divider"></div>
+            <button class="download-context-item danger" data-action="delete-local">
+                <i class="fa-solid fa-trash"></i> 删除本地文件
+            </button>
+        `;
+    } else {
+        menuItems += `
+            <button class="download-context-item" data-action="download">
+                <i class="fa-solid fa-download"></i> 下载歌曲
+            </button>
+            <button class="download-context-item" data-action="download-lyric">
+                <i class="fa-solid fa-file-lines"></i> 下载歌词
+            </button>
+            <button class="download-context-item" data-action="download-cover">
+                <i class="fa-regular fa-image"></i> 下载封面
+            </button>
+        `;
+    }
+
+    menu.innerHTML = menuItems;
+    menu.style.left = `${event.clientX}px`;
+    menu.style.top = `${event.clientY}px`;
+    document.body.appendChild(menu);
+
+    // Adjust if overflows viewport
+    const rect = menu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) {
+        menu.style.left = `${window.innerWidth - rect.width - 8}px`;
+    }
+    if (rect.bottom > window.innerHeight) {
+        menu.style.top = `${window.innerHeight - rect.height - 8}px`;
+    }
+
+    menu.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-action]');
+        if (!btn) return;
+        const action = btn.dataset.action;
+
+        if (action === 'play') {
+            const playBtn = itemEl.querySelector('.play-btn');
+            if (playBtn) playBtn.click();
+        } else if (action === 'add-playlist') {
+            const addBtn = itemEl.querySelector('.actions button[title="收藏到自制歌单"]');
+            if (addBtn) addBtn.click();
+        } else if (action === 'reveal') {
+            revealInFolder(relPath);
+        } else if (action === 'copy-path') {
+            const fullPath = webSettings.downloadDir ? `${webSettings.downloadDir}/${relPath}` : relPath;
+            navigator.clipboard.writeText(fullPath).then(() => {
+                showToast('已复制路径', fullPath, 'success', 2000);
+            }).catch(() => {
+                showToast('复制失败', '浏览器不支持剪贴板操作', 'error');
+            });
+        } else if (action === 'delete-local') {
+            const delBtn = itemEl.querySelector('.actions button.danger[title="删除本地音乐"]');
+            if (delBtn) {
+                delBtn.click();
+            } else {
+                deleteLocalMusicDirect(id, name, artist);
+            }
+        } else if (action === 'download') {
+            const dlBtn = itemEl.querySelector('.btn-dl:not(.btn-browser-download):not(.btn-lyric):not(.btn-cover)');
+            if (dlBtn) dlBtn.click();
+        } else if (action === 'download-lyric') {
+            const lrcLink = itemEl.querySelector('.btn-lyric');
+            if (lrcLink) {
+                lrcLink.click();
+            } else {
+                window.open(`${API_ROOT}/download_lrc?id=${encodeURIComponent(id)}&source=${encodeURIComponent(source)}&name=${encodeURIComponent(name)}&artist=${encodeURIComponent(artist)}`);
+            }
+        } else if (action === 'download-cover') {
+            const coverLink = itemEl.querySelector('.btn-cover');
+            if (coverLink) {
+                coverLink.click();
+            } else {
+                const coverUrl = itemEl.dataset.cover || '';
+                window.open(`${API_ROOT}/download_cover?url=${encodeURIComponent(coverUrl)}&name=${encodeURIComponent(name)}&artist=${encodeURIComponent(artist)}`);
+            }
+        }
+        menu.remove();
+    });
+
+    const dismissMenu = (e) => {
+        if (!menu.contains(e.target)) {
+            menu.remove();
+            document.removeEventListener('click', dismissMenu);
+            document.removeEventListener('contextmenu', dismissMenu);
+        }
+    };
+    setTimeout(() => {
+        document.addEventListener('click', dismissMenu);
+        document.addEventListener('contextmenu', dismissMenu);
+    }, 0);
+}
+window.showSongRowContextMenu = showSongRowContextMenu;
 
 function showDownloadContextMenu(event, itemEl) {
     event.preventDefault();

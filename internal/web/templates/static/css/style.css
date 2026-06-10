@@ -2350,6 +2350,15 @@ body.batch-mode .checkbox-wrapper {
 	font-weight: 600 !important;
 	color: #ffffff !important;
 }
+/* 隐藏禁用后的悬浮歌词 */
+.floating-lyrics-disabled .aplayer-lrc,
+.floating-lyrics-disabled #karaoke-lyrics {
+	display: none !important;
+}
+/* 底部播放器歌词按钮激活状态 */
+.player-bar-right .icon-btn.active {
+	color: var(--accent) !important;
+}
 
 /* 隐藏旧版右上角浮动按钮 */
 .settings-float {

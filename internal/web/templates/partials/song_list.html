@@ -101,6 +101,8 @@
             data-cover="{{.Cover}}"
             data-sort-size="{{ if .Extra }}{{ index .Extra "size" }}{{ end }}"
             data-sort-bitrate="{{ if .Extra }}{{ index .Extra "bitrate" }}{{ end }}"
+            data-rel-path="{{ if .Extra }}{{ index .Extra "rel_path" }}{{ end }}"
+            oncontextmenu="showSongRowContextMenu(event, this)"
             data-extra='{{tojson .Extra}}'>
 
             <!-- 批量选择框 -->

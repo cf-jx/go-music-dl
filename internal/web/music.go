@@ -1049,6 +1049,8 @@ func RegisterMusicRoutes(api *gin.RouterGroup) {
 		filePath := strings.TrimSpace(c.Query("path"))
 		if filePath == "" {
 			filePath = downloadDir
+		} else if !filepath.IsAbs(filePath) {
+			filePath = filepath.Join(downloadDir, filePath)
 		}
 		filePath = filepath.Clean(filePath)
 

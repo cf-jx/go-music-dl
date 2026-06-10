@@ -58,7 +58,7 @@ func TestAppJSAutoSwitchInvalidSources(t *testing.T) {
 		"card.dataset.autoSwitchInvalidAttempted = '1'",
 		"selectInvalidSongCards({ silent: true, cards: invalidCards })",
 		"await batchSwitchSource({ skipConfirm: true, silent: true, auto: true, cards: invalidCards })",
-		"if (document.querySelector('.tag-fail'))",
+		"document.querySelector('.tag-fail')",
 		"card.dataset.inspectPending = '1'",
 		"async function batchSwitchSource(options = {})",
 		"if (!options.skipConfirm && !confirm",
