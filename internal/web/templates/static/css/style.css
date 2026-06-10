@@ -849,21 +849,23 @@ body.batch-mode .song-row {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	margin-bottom: 12px;
+	margin-bottom: 14px;
 	flex-wrap: wrap;
 	gap: 12px;
 }
 .result-header h2 {
 	margin: 0;
 	font-family: var(--font-display);
-	font-size: 22px;
-	font-weight: 700;
-	letter-spacing: -0.3px;
+	font-size: 20px;
+	font-weight: 600;
+	letter-spacing: -0.5px;
+	color: var(--text-primary);
 }
 .result-count {
-	font-size: 13px;
+	font-size: 12px;
 	color: var(--text-secondary);
-	font-weight: 500;
+	font-weight: 400;
+	margin-top: 3px;
 }
 .result-count strong {
 	color: var(--accent);
@@ -1482,23 +1484,22 @@ body.batch-mode .song-row {
 .source-selector.is-collapsed .source-collapse-icon { transform: rotate(180deg); }
 .source-collapse-btn { background: none; border: none; padding: 0; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; display: inline-block; }
 .source-collapse-btn {
-	background: var(--bg-content) !important;
-	border: 1px solid var(--border) !important;
-	padding: 6px 12px !important;
-	border-radius: var(--r-sm) !important;
+	background: var(--bg-input) !important;
+	border: none !important;
+	padding: 6px 14px !important;
+	border-radius: var(--r-full) !important;
 	display: inline-flex !important;
 	align-items: center !important;
 	gap: 6px !important;
 	cursor: pointer !important;
 	color: var(--text-secondary) !important;
-	font-size: 13px !important;
+	font-size: 12px !important;
 	font-weight: 500 !important;
 	transition: all var(--ease) !important;
 }
 .source-collapse-btn:hover {
 	color: var(--accent) !important;
-	background: var(--bg-hover) !important;
-	border-color: var(--accent) !important;
+	background: var(--accent-bg) !important;
 }
 
 /* ── App Toast (used by JS showToast) ── */
@@ -2007,23 +2008,27 @@ body.batch-mode .song-row {
 	display: inline-flex;
 	align-items: center;
 	gap: 4px;
-	padding: 3px;
+	padding: 2px 4px;
 	background: var(--bg-input);
 	border-radius: var(--r-full);
 }
 .sort-control select {
 	border: none;
 	background: transparent;
-	font-size: 13px;
+	font-size: 12px;
 	font-weight: 500;
-	color: var(--text-primary);
+	color: var(--text-secondary);
 	outline: none;
-	padding: 4px 8px;
+	padding: 4px 22px 4px 10px;
 	cursor: pointer;
+	appearance: none;
+	-webkit-appearance: none;
+	background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%238e8e93'%3E%3Cpath d='M7 10l5 5 5-5H7z'/%3E%3C/svg%3E") no-repeat right 6px center;
+	background-size: 14px;
 }
 .sort-dir-btn {
-	width: 26px;
-	height: 26px;
+	width: 24px;
+	height: 24px;
 	border-radius: var(--r-full);
 	background: var(--bg-content);
 	border: none;
@@ -2031,7 +2036,7 @@ body.batch-mode .song-row {
 	align-items: center;
 	justify-content: center;
 	color: var(--text-secondary);
-	font-size: 12px;
+	font-size: 11px;
 	cursor: pointer;
 	transition: all var(--ease);
 }
@@ -2092,13 +2097,7 @@ body.batch-mode .song-row {
 .source-chip:hover {
 	border-color: var(--accent);
 }
-.source-chip:has(input:checked) {
-	border-color: var(--accent);
-	background: var(--accent-bg);
-}
-.source-chip:has(input:checked) .source-chip-name {
-	color: var(--accent);
-}
+
 .source-chip input {
 	opacity: 0;
 	width: 0;
