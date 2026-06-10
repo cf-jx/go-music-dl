@@ -900,11 +900,8 @@ async function navigateTo(url, options = {}) {
         return false;
     }
 
-    if (targetURL.hash === '#/downloading') {
-        showDownloadingPage({ updateHistory: options.historyMode !== 'none' });
-        return true;
-    } else if (targetURL.hash === '#/downloaded') {
-        showDownloadedPage({ updateHistory: options.historyMode !== 'none' });
+    if (targetURL.hash === '#/downloads' || targetURL.hash === '#/downloading' || targetURL.hash === '#/downloaded') {
+        showDownloadsPage({ updateHistory: options.historyMode !== 'none' });
         return true;
     }
 
@@ -1078,8 +1075,8 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchWebSettings().finally(() => maybeAutoCheckUpdate());
     bindPageNavigationEvents();
     initializePageContent(document);
-    if (window.location.hash === '#/downloading' || window.location.hash === '#/downloaded') {
-        navigateTo(window.location.hash, { historyMode: 'none' });
+    if (window.location.hash === '#/downloads' || window.location.hash === '#/downloading' || window.location.hash === '#/downloaded') {
+        navigateTo('#/downloads', { historyMode: 'none' });
     }
     if (new URLSearchParams(window.location.search).get(OPEN_CONFIG_QUERY) === '1') {
         const url = new URL(window.location.href);
@@ -5278,121 +5275,109 @@ const DownloadManager = {
     },
 
     refreshPagesIfActive() {
-        if (window.location.hash === '#/downloading') {
-            showDownloadingPage({ updateHistory: false });
-        } else if (window.location.hash === '#/downloaded') {
-            showDownloadedPage({ updateHistory: false });
+        if (window.location.hash === '#/downloads' || window.location.hash === '#/downloading' || window.location.hash === '#/downloaded') {
+            showDownloadsPage({ updateHistory: false });
         }
     }
 };
 window.DownloadManager = DownloadManager;
 
-function showDownloadingPage(options = {}) {
-    updateActiveSidebarItem('sidebar-downloading-btn');
+function showDownloadsPage(options = {}) {
+    updateActiveSidebarItem('sidebar-downloads-btn');
     if (options.updateHistory !== false) {
-        window.history.pushState(null, '', '#/downloading');
+        window.history.pushState(null, '', '#/downloads');
     }
 
     const container = document.querySelector('.container');
     if (!container) return;
 
-    let itemsHtml = '';
-    if (DownloadManager.active.length === 0) {
-        itemsHtml = `
-            <div class="empty-state">
-                <i class="fa-solid fa-spinner"></i>
-                <p>当前没有正在下载的音乐</p>
-            </div>
-        `;
-    } else {
-        itemsHtml = `
-            <div class="download-list">
-                ${DownloadManager.active.map(item => `
-                    <div class="download-item card">
-                        <img class="download-item-art" src="${item.cover || '/icon.png'}" onerror="this.src='/icon.png'">
-                        <div class="download-item-info">
-                            <div class="download-item-title">${escapeHTML(item.name)}</div>
-                            <div class="download-item-artist">${escapeHTML(item.artist)} — ${escapeHTML(item.album)}</div>
-                        </div>
-                        <div class="download-item-status">
-                            <i class="fa-solid fa-spinner fa-spin"></i> 正在下载...
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-        `;
-    }
-
-    container.innerHTML = `
-        <div class="content-header">
-            <h1 class="page-title">下载中</h1>
-        </div>
-        <div class="download-page-content">
-            ${itemsHtml}
-        </div>
-    `;
-}
-window.showDownloadingPage = showDownloadingPage;
-
-function showDownloadedPage(options = {}) {
-    updateActiveSidebarItem('sidebar-downloaded-btn');
-    if (options.updateHistory !== false) {
-        window.history.pushState(null, '', '#/downloaded');
-    }
-
-    const container = document.querySelector('.container');
-    if (!container) return;
-
-    let itemsHtml = '';
-    const completed = DownloadManager.completed;
-    if (completed.length === 0) {
-        itemsHtml = `
-            <div class="empty-state">
-                <i class="fa-solid fa-circle-down"></i>
-                <p>暂无已下载的音乐记录</p>
-            </div>
-        `;
-    } else {
-        itemsHtml = `
-            <div class="download-history-actions" style="margin-bottom: 15px; display: flex; justify-content: flex-end;">
-                <button class="cookie-qr-btn danger" onclick="clearDownloadHistory()">
-                    <i class="fa-solid fa-trash"></i> 清空历史记录
-                </button>
-            </div>
-            <div class="download-list">
-                ${completed.map((item, idx) => `
-                    <div class="download-item card ${item.status}">
-                        <img class="download-item-art" src="${item.cover || '/icon.png'}" onerror="this.src='/icon.png'">
-                        <div class="download-item-info">
-                            <div class="download-item-title">${escapeHTML(item.name)}</div>
-                            <div class="download-item-artist">${escapeHTML(item.artist)} — ${escapeHTML(item.album)}</div>
-                            <div class="download-item-path">${escapeHTML(item.path || '')}</div>
-                        </div>
-                        <div class="download-item-right">
-                            <div class="download-item-time">${formatTimeAgo(item.timestamp)}</div>
-                            <div class="download-item-status-tag ${item.status}">
-                                ${item.status === 'success' 
-                                    ? '<span class="status-success"><i class="fa-solid fa-circle-check"></i> 成功</span>' 
-                                    : `<span class="status-failed" title="${escapeHTML(item.error || '未知错误')}"><i class="fa-solid fa-circle-xmark"></i> 失败</span>`
-                                }
+    // ── Downloading section ──
+    let downloadingHtml = '';
+    if (DownloadManager.active.length > 0) {
+        downloadingHtml = `
+            <div class="downloads-section">
+                <div class="downloads-section-header">
+                    <h2 class="downloads-section-title"><i class="fa-solid fa-spinner fa-spin-slow"></i> 下载中 <span class="downloads-count">${DownloadManager.active.length}</span></h2>
+                </div>
+                <div class="download-list">
+                    ${DownloadManager.active.map(item => `
+                        <div class="download-item card">
+                            <img class="download-item-art" src="${item.cover || '/icon.png'}" onerror="this.src='/icon.png'">
+                            <div class="download-item-info">
+                                <div class="download-item-title">${escapeHTML(item.name)}</div>
+                                <div class="download-item-artist">${escapeHTML(item.artist)} — ${escapeHTML(item.album)}</div>
+                            </div>
+                            <div class="download-item-status">
+                                <i class="fa-solid fa-spinner fa-spin"></i> 正在下载...
                             </div>
                         </div>
-                    </div>
-                `).reverse().join('')}
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    // ── Completed section ──
+    let completedHtml = '';
+    const completed = DownloadManager.completed;
+    if (completed.length > 0) {
+        completedHtml = `
+            <div class="downloads-section">
+                <div class="downloads-section-header">
+                    <h2 class="downloads-section-title"><i class="fa-solid fa-circle-check"></i> 已完成 <span class="downloads-count">${completed.length}</span></h2>
+                    <button class="downloads-clear-btn" onclick="clearDownloadHistory()">
+                        <i class="fa-solid fa-trash"></i> 清空记录
+                    </button>
+                </div>
+                <div class="download-list">
+                    ${completed.map((item, idx) => `
+                        <div class="download-item card ${item.status}">
+                            <img class="download-item-art" src="${item.cover || '/icon.png'}" onerror="this.src='/icon.png'">
+                            <div class="download-item-info">
+                                <div class="download-item-title">${escapeHTML(item.name)}</div>
+                                <div class="download-item-artist">${escapeHTML(item.artist)} — ${escapeHTML(item.album)}</div>
+                                <div class="download-item-path">${escapeHTML(item.path || '')}</div>
+                            </div>
+                            <div class="download-item-right">
+                                <div class="download-item-time">${formatTimeAgo(item.timestamp)}</div>
+                                <div class="download-item-status-tag ${item.status}">
+                                    ${item.status === 'success' 
+                                        ? '<span class="status-success"><i class="fa-solid fa-circle-check"></i> 成功</span>' 
+                                        : `<span class="status-failed" title="${escapeHTML(item.error || '未知错误')}"><i class="fa-solid fa-circle-xmark"></i> 失败</span>`
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    `).reverse().join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    // ── Empty state ──
+    let emptyHtml = '';
+    if (DownloadManager.active.length === 0 && completed.length === 0) {
+        emptyHtml = `
+            <div class="empty-state">
+                <i class="fa-solid fa-circle-down"></i>
+                <p>暂无下载记录</p>
+                <p style="font-size:12px;color:var(--text-tertiary);margin-top:8px;">搜索歌曲后，点击下载按钮即可在这里查看进度</p>
             </div>
         `;
     }
 
     container.innerHTML = `
         <div class="content-header">
-            <h1 class="page-title">下载完成</h1>
+            <h1 class="page-title">下载</h1>
         </div>
         <div class="download-page-content">
-            ${itemsHtml}
+            ${downloadingHtml}
+            ${completedHtml}
+            ${emptyHtml}
         </div>
     `;
 }
-window.showDownloadedPage = showDownloadedPage;
+window.showDownloadsPage = showDownloadsPage;
 
 function clearDownloadHistory() {
     if (confirm('确定要清空全部已下载历史记录吗？')) {

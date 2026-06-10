@@ -1842,6 +1842,58 @@ body.batch-mode .song-row {
 	margin-left: 6px;
 }
 
+/* ── Downloads unified page sections ── */
+.downloads-section {
+	margin-bottom: 28px;
+}
+.downloads-section-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 14px;
+	padding-bottom: 10px;
+	border-bottom: 1px solid var(--border);
+}
+.downloads-section-title {
+	font-size: 15px;
+	font-weight: 600;
+	color: var(--text-primary);
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0;
+}
+.downloads-section-title i {
+	color: var(--accent);
+	font-size: 14px;
+}
+.downloads-count {
+	background: var(--bg-hover);
+	color: var(--text-secondary);
+	padding: 1px 8px;
+	border-radius: var(--r-full);
+	font-size: 12px;
+	font-weight: 500;
+}
+.downloads-clear-btn {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	padding: 5px 12px;
+	border: 1px solid var(--border);
+	border-radius: var(--r-md);
+	background: transparent;
+	color: var(--text-secondary);
+	font-size: 12px;
+	cursor: pointer;
+	transition: all var(--ease);
+}
+.downloads-clear-btn:hover {
+	background: var(--red-bg);
+	color: var(--red);
+	border-color: var(--red);
+}
+
 /* ── Spotify-like resolved note ── */
 .resolved-note {
 	display: flex;
