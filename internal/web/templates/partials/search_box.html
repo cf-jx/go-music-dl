@@ -83,6 +83,7 @@
             data-playlist-supported="{{ index $.PlaylistSupported $source }}"
             data-album-supported="{{ index $.AlbumSupported $source }}">
             <input type="checkbox" name="sources" value="{{ $source }}" class="source-checkbox"
+                form="search-form"
                 {{ if $.Selected }}
                     {{ range $.Selected }}{{ if eq . $source }}checked{{ end }}{{ end }}
                 {{ else }}

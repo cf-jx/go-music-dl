@@ -2062,17 +2062,18 @@ body.batch-mode .song-row {
 	color: var(--accent);
 }
 .source-grid {
-	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-	gap: 8px;
-	margin-top: 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin-top: 10px;
+	max-width: 480px; /* Compact width for vertical rows */
 }
 .source-chip {
 	display: flex;
 	flex-direction: row;
 	align-items: center;
 	justify-content: space-between;
-	padding: 10px 14px;
+	padding: 6px 12px; /* Thinner padding to make them smaller */
 	border-radius: var(--r-md);
 	border: 1px solid var(--border);
 	background: var(--bg-content);
@@ -2099,12 +2100,12 @@ body.batch-mode .song-row {
 }
 .source-chip-info {
 	display: flex;
-	flex-direction: column;
-	align-items: flex-start;
-	gap: 2px;
+	flex-direction: row; /* Side-by-side name and description */
+	align-items: center;
+	gap: 8px;
 }
 .source-chip-name {
-	font-size: 13px;
+	font-size: 12px; /* Thinner font size */
 	font-weight: 600;
 	color: var(--text-primary);
 }
@@ -2112,11 +2113,21 @@ body.batch-mode .song-row {
 	font-size: 11px;
 	color: var(--text-tertiary);
 }
-.source-chip input:checked + .setting-switch {
+.source-chip .setting-switch {
+	width: 32px; /* Smaller switch width */
+	height: 18px; /* Smaller switch height */
+}
+.source-chip .setting-switch::before {
+	top: 2px;
+	left: 2px;
+	width: 14px; /* Smaller switch knob */
+	height: 14px;
+}
+.source-chip input:checked ~ .setting-switch {
 	background: var(--green);
 }
-.source-chip input:checked + .setting-switch::before {
-	transform: translateX(18px);
+.source-chip input:checked ~ .setting-switch::before {
+	transform: translateX(14px); /* Smaller shift distance */
 }
 
 /* ── 扫码登录弹窗 ── */

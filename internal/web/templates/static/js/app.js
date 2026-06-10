@@ -706,11 +706,28 @@ function isAppRoute(pathname) {
 function bindSourceSelectorButtons(root = document) {
     const checkboxes = root.querySelectorAll('.source-checkbox');
 
+    const updateChipClass = (cb) => {
+        const chip = cb.closest('.source-chip');
+        if (chip) {
+            chip.classList.toggle('checked', cb.checked);
+        }
+    };
+
+    checkboxes.forEach(cb => {
+        updateChipClass(cb);
+        cb.addEventListener('change', () => {
+            updateChipClass(cb);
+        });
+    });
+
     const btnAll = document.getElementById('btn-all');
     if (btnAll) {
         btnAll.onclick = () => {
             checkboxes.forEach(cb => {
-                if (!cb.disabled) cb.checked = true;
+                if (!cb.disabled) {
+                    cb.checked = true;
+                    updateChipClass(cb);
+                }
             });
         };
     }
@@ -719,7 +736,10 @@ function bindSourceSelectorButtons(root = document) {
     if (btnNone) {
         btnNone.onclick = () => {
             checkboxes.forEach(cb => {
-                if (!cb.disabled) cb.checked = false;
+                if (!cb.disabled) {
+                    cb.checked = false;
+                    updateChipClass(cb);
+                }
             });
         };
     }
