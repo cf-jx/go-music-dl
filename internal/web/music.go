@@ -128,6 +128,60 @@ type playlistCategoryCurrent struct {
 	CategoryName string
 }
 
+const playlistCategoryCacheTTL = 30 * time.Minute
+
+type playlistCategoryCacheEntry struct {
+	categories []model.PlaylistCategory
+	expiresAt  time.Time
+}
+
+var playlistCategoryCache = struct {
+	sync.RWMutex
+	entries map[string]playlistCategoryCacheEntry
+}{
+	entries: make(map[string]playlistCategoryCacheEntry),
+}
+
+func cachedPlaylistCategories(source string) ([]model.PlaylistCategory, error) {
+	now := time.Now()
+	playlistCategoryCache.RLock()
+	entry, ok := playlistCategoryCache.entries[source]
+	playlistCategoryCache.RUnlock()
+	if ok && now.Before(entry.expiresAt) {
+		return append([]model.PlaylistCategory(nil), entry.categories...), nil
+	}
+
+	fn := core.GetPlaylistCategoriesFunc(source)
+	if fn == nil {
+		return nil, fmt.Errorf("该源不支持歌单分类")
+	}
+	categories, err := fn()
+	if err != nil || len(categories) == 0 {
+		return categories, err
+	}
+
+	stored := append([]model.PlaylistCategory(nil), categories...)
+	playlistCategoryCache.Lock()
+	playlistCategoryCache.entries[source] = playlistCategoryCacheEntry{
+		categories: stored,
+		expiresAt:  now.Add(playlistCategoryCacheTTL),
+	}
+	playlistCategoryCache.Unlock()
+	return append([]model.PlaylistCategory(nil), stored...), nil
+}
+
+func warmPlaylistCategoryCache() {
+	var wg sync.WaitGroup
+	for _, source := range core.GetPlaylistCategorySourceNames() {
+		wg.Add(1)
+		go func(src string) {
+			defer wg.Done()
+			_, _ = cachedPlaylistCategories(src)
+		}(source)
+	}
+	wg.Wait()
+}
+
 func playlistCategorySourcesFromQuery(c *gin.Context) []string {
 	requested := c.QueryArray("sources")
 	if len(requested) == 0 {
@@ -167,14 +221,10 @@ func loadPlaylistCategoryPageSources(sources []string) ([]playlistCategoryPageSo
 	var mu sync.Mutex
 
 	for _, source := range sources {
-		fn := core.GetPlaylistCategoriesFunc(source)
-		if fn == nil {
-			continue
-		}
 		wg.Add(1)
 		go func(src string) {
 			defer wg.Done()
-			categories, err := fn()
+			categories, err := cachedPlaylistCategories(src)
 			mu.Lock()
 			results[src] = categoryResult{source: src, categories: categories, err: err}
 			mu.Unlock()
@@ -285,6 +335,19 @@ func filterAvailableSources(requested, supported []string) []string {
 	return result
 }
 
+func friendlyPlaylistSourceError(err error) string {
+	if err == nil {
+		return ""
+	}
+	message := strings.ToLower(strings.TrimSpace(err.Error()))
+	for _, marker := range []string{"cookie", "login", "auth", "unauthorized", "forbidden", "登录"} {
+		if strings.Contains(message, marker) {
+			return "未登录或登录已失效，请在偏好设置中登录后重试。"
+		}
+	}
+	return "加载失败，请稍后重试。"
+}
+
 func loadPlaylistSourceTabs(sources []string, fetcher func(string) ([]model.Playlist, error)) ([]playlistSourceTab, string) {
 	type tabResult struct {
 		source    string
@@ -324,7 +387,7 @@ func loadPlaylistSourceTabs(sources []string, fetcher func(string) ([]model.Play
 			Playlists: res.playlists,
 		}
 		if res.err != nil {
-			tab.Error = res.err.Error()
+			tab.Error = friendlyPlaylistSourceError(res.err)
 			failed = append(failed, tab.Name)
 		}
 		tabs = append(tabs, tab)
@@ -1037,7 +1100,8 @@ func RegisterMusicRoutes(api *gin.RouterGroup) {
 	api.POST("/download_cover", downloadCoverHandler)
 
 	api.GET("/reveal", func(c *gin.Context) {
-		if !allowSaveLocalRequest(c) {
+		if !allowSameOriginWrite(c) {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 			return
 		}
 		settings := core.GetWebSettings()
@@ -1103,7 +1167,8 @@ func RegisterMusicRoutes(api *gin.RouterGroup) {
 	})
 
 	api.POST("/delete_file", func(c *gin.Context) {
-		if !allowSaveLocalRequest(c) {
+		if !allowSameOriginWrite(c) {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 			return
 		}
 		filePath := strings.TrimSpace(c.Query("path"))

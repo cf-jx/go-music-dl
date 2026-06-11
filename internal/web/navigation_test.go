@@ -1,6 +1,7 @@
 package web
 
 import (
+	"bytes"
 	"encoding/json"
 	"html/template"
 	"net/http/httptest"
@@ -66,6 +67,76 @@ func TestRenderIndexPlaylistCardsUseAjaxNavigation(t *testing.T) {
 	}
 	if !strings.Contains(body, `onclick="navigateTo('`) {
 		t.Fatalf("rendered html missing navigateTo playlist navigation: %s", body)
+	}
+}
+
+func TestIndexUsesEmbeddedPlayerAndIconAssets(t *testing.T) {
+	for _, path := range []string{
+		"templates/pages/index.html",
+		"templates/pages/auth.html",
+		"templates/pages/render.html",
+	} {
+		content, err := templateFS.ReadFile(path)
+		if err != nil {
+			t.Fatalf("ReadFile(%s): %v", path, err)
+		}
+		if strings.Contains(string(content), "cdn.jsdelivr.net") {
+			t.Fatalf("%s should not depend on CDN assets", path)
+		}
+	}
+
+	content, err := templateFS.ReadFile("templates/pages/index.html")
+	if err != nil {
+		t.Fatalf("ReadFile(index.html): %v", err)
+	}
+	for _, want := range []string{
+		`{{.Root}}/vendor/aplayer/APlayer.min.css`,
+		`{{.Root}}/vendor/aplayer/APlayer.min.js`,
+		`{{.Root}}/vendor/fontawesome/css/all.min.css`,
+	} {
+		if !strings.Contains(string(content), want) {
+			t.Fatalf("index.html missing embedded asset %q", want)
+		}
+	}
+}
+
+func TestSongListUsesImportedCollectionMetadataAsHeading(t *testing.T) {
+	var output bytes.Buffer
+	err := newTestTemplate(t).ExecuteTemplate(&output, "song_list", gin.H{
+		"Root":       RoutePrefix,
+		"SearchType": "song",
+		"Result": []model.Song{
+			{
+				ID:     "track-1",
+				Source: "qq",
+				Name:   "Track",
+				Artist: "Artist",
+			},
+		},
+		"TotalCount": 1,
+		"TotalPages": 1,
+		"Page":       1,
+		"PageStart":  1,
+		"PageEnd":    1,
+		"ImportCollection": &importCollectionMeta{
+			Name:        "Real Album Name",
+			Creator:     "Album Artist",
+			ContentType: collectionContentAlbum,
+		},
+	})
+	if err != nil {
+		t.Fatalf("ExecuteTemplate(song_list): %v", err)
+	}
+
+	body := output.String()
+	if !strings.Contains(body, "Real Album Name（共 1 首）") {
+		t.Fatalf("song list missing imported collection heading: %s", body)
+	}
+	if !strings.Contains(body, "专辑") || !strings.Contains(body, "Album Artist") {
+		t.Fatalf("song list missing imported collection metadata: %s", body)
+	}
+	if strings.Contains(body, "音乐搜索结果") {
+		t.Fatalf("song list should not show a generic search heading for collection details: %s", body)
 	}
 }
 
@@ -139,6 +210,57 @@ func TestAppJSIncludesAjaxNavigationEntryPoints(t *testing.T) {
 	}
 	if !strings.Contains(js, "offset: String(offset)") {
 		t.Fatal("app.js missing paged local music API request")
+	}
+	for _, want := range []string{
+		"controller?.abort(), 90000",
+		"下载超时，请检查网络后重试",
+		"sizeBytes >= 50 * 1024 * 1024",
+		"showActionConfirm(",
+		"确认下载大文件",
+		"保存到本地可能需要较长时间",
+		"window.alert = (message) =>",
+	} {
+		if !strings.Contains(js, want) {
+			t.Fatalf("app.js missing guarded local download token %q", want)
+		}
+	}
+	if strings.Contains(js, "confirm(") {
+		t.Fatal("app.js should not use native confirm dialogs")
+	}
+}
+
+func TestModalsIncludeVisibleActionConfirmation(t *testing.T) {
+	content, err := templateFS.ReadFile("templates/partials/modals.html")
+	if err != nil {
+		t.Fatalf("ReadFile(modals.html): %v", err)
+	}
+	html := string(content)
+	for _, want := range []string{
+		`id="actionConfirmModal"`,
+		`id="actionConfirmMessage"`,
+		`onclick="closeActionConfirm(false)"`,
+		`onclick="closeActionConfirm(true)"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("modals.html missing confirmation token %q", want)
+		}
+	}
+}
+
+func TestTemplatesDoNotUseRemotePlaceholderImages(t *testing.T) {
+	for _, path := range []string{
+		"templates/partials/playlist_grid.html",
+		"templates/partials/playlist_source_tabs.html",
+		"templates/static/js/app.js",
+		"templates/static/js/videogen.js",
+	} {
+		content, err := templateFS.ReadFile(path)
+		if err != nil {
+			t.Fatalf("ReadFile(%s): %v", path, err)
+		}
+		if strings.Contains(string(content), "via.placeholder.com") {
+			t.Fatalf("%s should use the embedded fallback image", path)
+		}
 	}
 }
 

@@ -1,6 +1,7 @@
 package web
 
 import (
+	"errors"
 	"net/http/httptest"
 	"net/url"
 	"reflect"
@@ -53,6 +54,15 @@ func TestCollectionLabelsForSearchType(t *testing.T) {
 	}
 	if got := collectionLabelForSearchType("playlist"); got != "歌单" {
 		t.Fatalf("collectionLabelForSearchType(playlist) = %q, want 歌单", got)
+	}
+}
+
+func TestFriendlyPlaylistSourceErrorHidesProviderDetails(t *testing.T) {
+	if got := friendlyPlaylistSourceError(errors.New("netease user playlists require cookie")); got != "未登录或登录已失效，请在偏好设置中登录后重试。" {
+		t.Fatalf("friendlyPlaylistSourceError(cookie) = %q", got)
+	}
+	if got := friendlyPlaylistSourceError(errors.New("upstream returned internal payload")); got != "加载失败，请稍后重试。" {
+		t.Fatalf("friendlyPlaylistSourceError(generic) = %q", got)
 	}
 }
 

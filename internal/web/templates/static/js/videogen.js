@@ -270,7 +270,7 @@
                     let coverSrc = data.rawCover;
                     if (!data.rawCover.startsWith("data:")) coverSrc = `${apiRoot}/download_cover?url=${encodeURIComponent(data.rawCover)}&name=render&artist=render`;
                     await Promise.race([
-                        new Promise(r => { bgMedia.onload = r; bgMedia.onerror = () => { bgMedia.src = "https://via.placeholder.com/600"; setTimeout(r, 1000); }; bgMedia.src = coverSrc; }),
+                        new Promise(r => { bgMedia.onload = r; bgMedia.onerror = () => { bgMedia.src = `${apiRoot}/icon.png`; setTimeout(r, 1000); }; bgMedia.src = coverSrc; }),
                         new Promise((_, r) => setTimeout(() => r(new Error("资源加载超时")), 15000))
                     ]);
                 }
@@ -1166,7 +1166,7 @@
         if(this.localAudio) { this.localAudio.pause(); this.localAudio.removeAttribute('src'); this.localAudio.load(); }
 
         const modal = document.getElementById("vg-modal");
-        this.updateVisuals(songData.cover || "https://via.placeholder.com/600", false);
+        this.updateVisuals(songData.cover || `${window.API_ROOT}/icon.png`, false);
         document.getElementById("vg-title").textContent = songData.name;
         document.getElementById("vg-artist").textContent = songData.artist;
 
@@ -1386,7 +1386,7 @@
             source: this.data.source,
             name: this.data.name,
             artist: this.data.artist,
-            rawCover: this.customVisual || this.data.cover || "https://via.placeholder.com/600",
+            rawCover: this.customVisual || this.data.cover || `${window.API_ROOT}/icon.png`,
             isVideoBg: this.isVideoBg,
             lyricRaw: this.lyricRaw,
             lyricGroups: this.lyricGroups,

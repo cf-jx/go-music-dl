@@ -1,4 +1,6 @@
 {{define "search_box"}}
+{{ $isSearchPage := and (not .PlaylistSourceTabs) (not .PlaylistCategorySources) (not .PlaylistCategoryCurrent) (not .IsLocalColPage) (ne .SearchType "local_music") (eq .ColID "") }}
+{{ if $isSearchPage }}
 <div class="search-area">
     <form action="{{.Root}}/search" method="get" id="search-form">
         <input type="hidden" name="page" value="1">
@@ -98,4 +100,5 @@
         {{ end }}
     </div>
 </div>
+{{ end }}
 {{end}}

@@ -420,7 +420,8 @@ textarea {
 	font-weight: 500;
 	color: var(--text-secondary);
 	background: none;
-	border: none;
+	border: none !important;
+	outline: none !important;
 	transition: all var(--ease);
 	white-space: nowrap;
 }
@@ -432,6 +433,8 @@ textarea {
 	color: var(--text-primary);
 	font-weight: 600;
 	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+	border: none !important;
+	outline: none !important;
 }
 
 /* 搜索区域 */
@@ -561,16 +564,17 @@ textarea {
 }
 .song-row {
 	display: grid;
-	grid-template-columns: 42px 1fr 80px 120px 180px; /* cover, info, duration, source, actions */
+	grid-template-columns: 42px 1fr 80px 120px 120px; /* cover, info, duration, source, actions */
 	align-items: center;
 	gap: 16px;
 	padding: 8px 16px;
 	border-radius: var(--r-sm);
 	transition: background var(--ease);
 	cursor: default;
+	user-select: none; /* Prevent text selection during double click */
 }
 body.batch-mode .song-row {
-	grid-template-columns: 24px 42px 1fr 80px 120px 180px;
+	grid-template-columns: 24px 42px 1fr 80px 120px 120px;
 }
 .song-row:hover {
 	background: var(--bg-hover);
@@ -664,7 +668,7 @@ body.batch-mode .song-row {
 	border: none;
 	background: var(--bg-hover);
 	color: var(--text-secondary);
-	font-size: 13px;
+	font-size: 14px;
 	transition: all var(--ease);
 	flex-shrink: 0;
 	text-decoration: none;
@@ -689,15 +693,15 @@ body.batch-mode .song-row {
 
 
 .song-name {
-	font-size: 14px;
-	font-weight: 500;
+	font-size: 15px;
+	font-weight: 600;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	margin-bottom: 2px;
 }
 .song-artist {
-	font-size: 12px;
+	font-size: 13px;
 	color: var(--text-secondary);
 	white-space: nowrap;
 	overflow: hidden;
@@ -713,7 +717,7 @@ body.batch-mode .song-row {
 }
 
 .song-duration {
-	font-size: 12px;
+	font-size: 13px;
 	font-weight: 500;
 	color: var(--text-tertiary);
 	font-variant-numeric: tabular-nums;
@@ -729,7 +733,7 @@ body.batch-mode .song-row {
 	align-items: center;
 	padding: 2px 7px;
 	border-radius: var(--r-full);
-	font-size: 10px;
+	font-size: 11px;
 	font-weight: 600;
 	text-transform: uppercase;
 	background: var(--bg-tag);
@@ -755,6 +759,16 @@ body.batch-mode .song-row {
 .song-row:hover .song-actions,
 .song-row.playing-active .song-actions {
 	opacity: 1;
+}
+
+/* ── 极简操作栏：仅显示收藏、下载与更多按钮 ── */
+.song-actions .btn-play,
+.song-actions .btn-switch,
+.song-actions .btn-browser-download,
+.song-actions .btn-lyric,
+.song-actions .btn-cover,
+.song-actions .btn-delete-local {
+	display: none !important;
 }
 
 .icon-btn {
@@ -1277,6 +1291,23 @@ body.batch-mode .song-row {
 	gap: 8px;
 }
 
+.action-confirm-modal {
+	max-width: 420px;
+}
+.action-confirm-message {
+	margin: 0;
+	color: var(--text-secondary);
+	font-size: 14px;
+	line-height: 1.65;
+	white-space: pre-line;
+}
+.action-confirm-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 10px;
+	margin-top: 24px;
+}
+
 /* Toggle Switch (iOS 风格) */
 .toggle {
 	display: flex;
@@ -1666,27 +1697,31 @@ body.batch-mode .song-row {
 /* ── 返回顶部 ── */
 .back-to-top {
 	position: fixed;
-	right: 20px;
-	bottom: calc(var(--player-h) + 20px);
-	width: 36px;
-	height: 36px;
-	border-radius: var(--r-sm);
-	background: var(--bg-content);
+	right: 24px;
+	bottom: calc(var(--player-h) + 24px);
+	width: 40px;
+	height: 40px;
+	border-radius: var(--r-full);
+	background: var(--bg-glass);
+	backdrop-filter: blur(20px) saturate(180%);
+	-webkit-backdrop-filter: blur(20px) saturate(180%);
 	border: 1px solid var(--border);
-	box-shadow: var(--shadow-sm);
+	box-shadow: var(--shadow-md);
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	color: var(--text-secondary);
+	color: var(--text-primary);
 	cursor: pointer;
 	z-index: 100;
 	opacity: 0;
 	visibility: hidden;
-	transition: all var(--ease);
+	transform: translateY(10px);
+	transition: opacity var(--ease), visibility var(--ease), transform var(--ease), background var(--ease), color var(--ease);
 }
 .back-to-top.show {
 	opacity: 1;
 	visibility: visible;
+	transform: translateY(0);
 }
 .back-to-top:hover {
 	background: var(--bg-hover);
@@ -1695,26 +1730,7 @@ body.batch-mode .song-row {
 
 /* ── 设置齿轮 ── */
 .settings-btn {
-	position: fixed;
-	top: 16px;
-	right: 20px;
-	width: 34px;
-	height: 34px;
-	border-radius: var(--r-sm);
-	background: var(--bg-content);
-	border: 1px solid var(--border);
-	box-shadow: var(--shadow-sm);
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	color: var(--text-secondary);
-	cursor: pointer;
-	z-index: 150;
-	transition: all var(--ease);
-}
-.settings-btn:hover {
-	background: var(--bg-hover);
-	color: var(--accent);
+	display: none !important;
 }
 
 /* ── 下载中/已下载追踪样式 ── */
@@ -2085,17 +2101,17 @@ body.batch-mode .song-row {
 	flex-direction: row;
 	align-items: center;
 	justify-content: space-between;
-	padding: 6px 12px; /* Thinner padding to make them smaller */
+	padding: 6px 12px;
 	border-radius: var(--r-md);
-	border: 1px solid var(--border);
-	background: var(--bg-content);
+	border: none;
+	background: var(--bg-input);
 	cursor: pointer;
 	transition: all var(--ease);
 	gap: 12px;
 	position: relative;
 }
 .source-chip:hover {
-	border-color: var(--accent);
+	background: var(--bg-hover);
 }
 
 .source-chip input {
@@ -2111,12 +2127,12 @@ body.batch-mode .song-row {
 	gap: 8px;
 }
 .source-chip-name {
-	font-size: 12px; /* Thinner font size */
+	font-size: 13px;
 	font-weight: 600;
 	color: var(--text-primary);
 }
 .source-chip-desc {
-	font-size: 11px;
+	font-size: 12px;
 	color: var(--text-tertiary);
 }
 .source-chip .setting-switch {
@@ -2403,12 +2419,15 @@ body.batch-mode .checkbox-wrapper {
 /* ── 移动端 ── */
 @media (max-width: 768px) {
 	.app-layout {
-		grid-template-columns: 1fr;
+		grid-template-columns: minmax(0, 1fr);
 		grid-template-rows: auto 1fr var(--player-h);
+		width: 100%;
 	}
 	.sidebar {
 		grid-row: 1;
 		grid-column: 1;
+		width: 100%;
+		min-width: 0;
 		flex-direction: row;
 		align-items: center;
 		padding: 8px 12px;
@@ -2447,32 +2466,51 @@ body.batch-mode .checkbox-wrapper {
 
 	.main-content {
 		grid-row: 2;
+		min-width: 0;
 		padding: 16px;
 	}
 	.player-bar {
 		grid-column: 1;
 		grid-row: 3;
+		min-width: 0;
 	}
 	.content-header {
-		flex-direction: column;
-		align-items: flex-start;
+		width: 100%;
+		margin-bottom: 16px;
 	}
 	.search-row {
-		flex-direction: column;
+		width: 100%;
+		flex-direction: row;
+		align-items: center;
+	}
+	.search-input-wrap {
+		width: auto;
+		min-width: 0;
+	}
+	.segmented-control {
+		width: 100%;
+	}
+	.segmented-control .segment {
+		flex: 1 1 0;
+		justify-content: center;
+		padding-inline: 10px;
 	}
 	.playlist-grid {
 		grid-template-columns: repeat(2, 1fr);
 		gap: 12px;
 	}
 	.action-row {
-		gap: 4px;
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 6px;
 	}
 	.action-row .btn {
+		justify-content: center;
+		min-width: 0;
 		font-size: 11px;
 		padding: 5px 10px;
 	}
 	.settings-btn {
-		top: 8px;
-		right: 8px;
+		display: none;
 	}
 }

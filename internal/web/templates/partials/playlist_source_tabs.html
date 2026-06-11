@@ -39,7 +39,7 @@
                 {{ $detailURL := playlistDetailURL $root "playlist" . }}
                 <div class="playlist-card" onclick="navigateTo('{{ $detailURL }}')">
                     <div class="playlist-card-cover">
-                        <img src="{{ .Cover }}" loading="lazy" onerror="this.src='https://via.placeholder.com/400?text=Cover'">
+                        <img src="{{ .Cover }}" loading="lazy" onerror="this.onerror=null;this.src='{{ $root }}/icon.png'">
                         <span class="tag tag-src" style="position:absolute; top:5px; right:5px; margin:0; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">{{ .Source }}</span>
                     </div>
                     <div class="playlist-card-body">

@@ -11,14 +11,8 @@
     <link rel="icon" href="{{.Root}}/icon.png" type="image/png" />
     <link rel="stylesheet" href="{{.Root}}/style.css" />
     <link rel="stylesheet" href="{{.Root}}/videogen.css" />
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/aplayer/dist/APlayer.min.css"
-    />
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/css/all.min.css"
-    />
+    <link rel="stylesheet" href="{{.Root}}/vendor/aplayer/APlayer.min.css" />
+    <link rel="stylesheet" href="{{.Root}}/vendor/fontawesome/css/all.min.css" />
   </head>
   <body>
     <!-- ═══════════ 设置按钮 ═══════════ -->
@@ -101,6 +95,9 @@
           </button>
 
           <span class="sidebar-nav-label">设置</span>
+          <button class="sidebar-item" onclick="openSystemConfig()">
+            <i class="fa-solid fa-gear"></i> 偏好设置
+          </button>
           <button class="sidebar-item" id="sidebar-theme-btn" onclick="toggleTheme()">
             <i class="fa-solid fa-moon"></i> <span>深色模式</span>
           </button>
@@ -177,7 +174,7 @@
 
     <div id="aplayer"></div>
 
-    <script src="https://cdn.jsdelivr.net/npm/aplayer/dist/APlayer.min.js"></script>
+    <script src="{{.Root}}/vendor/aplayer/APlayer.min.js"></script>
     <script>
       window.API_ROOT = "{{.Root}}";
     </script>

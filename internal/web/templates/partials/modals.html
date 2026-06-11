@@ -196,6 +196,22 @@
     </div>
 </div>
 
+<div id="actionConfirmModal" class="modal-overlay" style="z-index: 1010;" role="dialog" aria-modal="true" aria-labelledby="actionConfirmTitle" onclick="if (event.target === this) closeActionConfirm(false)">
+    <div class="modal action-confirm-modal">
+        <div class="modal-header">
+            <h3 id="actionConfirmTitle">确认操作</h3>
+            <button type="button" class="modal-close" aria-label="关闭" onclick="closeActionConfirm(false)"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+            <p id="actionConfirmMessage" class="action-confirm-message"></p>
+            <div class="action-confirm-actions">
+                <button type="button" class="btn-pill btn-pill-dl" onclick="closeActionConfirm(false)">取消</button>
+                <button type="button" id="actionConfirmSubmit" class="btn-pill btn-pill-primary" onclick="closeActionConfirm(true)">继续</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div id="qrLoginModal" class="modal-overlay" style="z-index: 1007;">
     <div class="modal qr-login-modal">
         <div class="modal-header">

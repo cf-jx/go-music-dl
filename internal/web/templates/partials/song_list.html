@@ -9,6 +9,13 @@
             <h2>{{ .ColName }}（共 {{ .TotalCount }} 首）</h2>
             {{ else if eq .SearchType "local_music" }}
             <h2>本地音乐（共 <strong>{{ .TotalCount }}</strong> 首）</h2>
+            {{ else if .ImportCollection }}
+            <h2>{{ .ImportCollection.Name }}（共 {{ .TotalCount }} 首）</h2>
+            <div class="result-count">
+                <span>{{ if eq .ImportCollection.ContentType "album" }}专辑{{ else }}歌单{{ end }}</span>
+                {{ if .ImportCollection.Creator }}<span style="margin-left: 8px; color: var(--text-secondary);">创建者: {{ .ImportCollection.Creator }}</span>{{ end }}
+                {{ if .PlaylistLink }}<a href="{{ .PlaylistLink }}" target="_blank" style="margin-left:8px;font-size:12px;"><i class="fa-solid fa-arrow-up-right-from-square"></i> 打开原始页面</a>{{ end }}
+            </div>
             {{ else }}
             <h2>{{ if eq .SearchType "playlist" }}歌单{{ else if eq .SearchType "album" }}专辑{{ else }}音乐{{ end }}搜索结果</h2>
             <div class="result-count">
@@ -22,6 +29,12 @@
         </div>
 
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            {{ if eq .SearchType "local_music" }}
+            <div class="local-search-wrap" style="position: relative; display: flex; align-items: center;">
+                <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 10px; color: var(--text-tertiary); font-size: 13px; pointer-events: none;"></i>
+                <input type="text" id="local-music-search" placeholder="在本地音乐中搜索..." onkeyup="filterLocalMusic(this.value)" style="padding: 6px 12px 6px 28px; border: none; border-radius: var(--r-sm); background: var(--bg-input); font-size: 13px; color: var(--text-primary); outline: none; transition: box-shadow 0.2s;" onfocus="this.style.boxShadow='0 0 0 3px rgba(10,132,255,0.2)'" onblur="this.style.boxShadow='none'">
+            </div>
+            {{ end }}
             {{ if gt .TotalCount 1 }}
             <div class="sort-control" id="song-sort-control">
                 <select id="song-sort-select" onchange="setSongSortMode(this.value)">
@@ -102,7 +115,10 @@
             data-sort-size="{{ if .Extra }}{{ index .Extra "size" }}{{ end }}"
             data-sort-bitrate="{{ if .Extra }}{{ index .Extra "bitrate" }}{{ end }}"
             data-rel-path="{{ if .Extra }}{{ index .Extra "rel_path" }}{{ end }}"
+            {{ if $.ColID }}data-col-id="{{$.ColID}}"{{ end }}
+            {{ if $.CanRemoveSongs }}data-can-remove="true"{{ end }}
             oncontextmenu="showSongRowContextMenu(event, this)"
+            ondblclick="playSongRowOnDblClick(this)"
             data-extra='{{tojson .Extra}}'>
 
             <!-- 批量选择框 -->
@@ -117,7 +133,7 @@
                 {{ else }}
                 <div class="song-art-placeholder"><i class="fa-solid fa-music"></i></div>
                 {{ end }}
-                <div class="song-art-overlay" onclick="playAllAndJumpTo(this.closest('.song-row'))">
+                <div class="song-art-overlay" onclick="event.stopPropagation(); playAllAndJumpTo(this.closest('.song-row'))">
                     <i class="fa-solid fa-play"></i>
                 </div>
             </div>
@@ -242,6 +258,9 @@
                     </a>
                     {{ end }}
                     {{ end }}
+                    <button type="button" class="btn-circle btn-more" title="更多" onclick="event.stopPropagation(); showSongRowMoreMenu(event, this)">
+                        <i class="fa-solid fa-ellipsis"></i>
+                    </button>
                 </div>
             </div>
         </li>

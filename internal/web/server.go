@@ -406,6 +406,22 @@ func StartWithOptions(port string, opts StartOptions) {
 	api.GET("/videogen.css", func(c *gin.Context) { c.FileFromFS("templates/static/css/videogen.css", http.FS(templateFS)) })
 	api.GET("/videogen.js", func(c *gin.Context) { c.FileFromFS("templates/static/js/videogen.js", http.FS(templateFS)) })
 	api.GET("/app.js", func(c *gin.Context) { c.FileFromFS("templates/static/js/app.js", http.FS(templateFS)) })
+	api.GET("/vendor/aplayer/APlayer.min.css", func(c *gin.Context) {
+		c.Header("Cache-Control", "public, max-age=31536000, immutable")
+		c.FileFromFS("templates/static/vendor/aplayer/APlayer.min.css", http.FS(templateFS))
+	})
+	api.GET("/vendor/aplayer/APlayer.min.js", func(c *gin.Context) {
+		c.Header("Cache-Control", "public, max-age=31536000, immutable")
+		c.FileFromFS("templates/static/vendor/aplayer/APlayer.min.js", http.FS(templateFS))
+	})
+	api.GET("/vendor/fontawesome/css/all.min.css", func(c *gin.Context) {
+		c.Header("Cache-Control", "public, max-age=31536000, immutable")
+		c.FileFromFS("templates/static/vendor/fontawesome/css/all.min.css", http.FS(templateFS))
+	})
+	api.GET("/vendor/fontawesome/webfonts/:name", func(c *gin.Context) {
+		c.Header("Cache-Control", "public, max-age=31536000, immutable")
+		c.FileFromFS("templates/static/vendor/fontawesome/webfonts/"+c.Param("name"), http.FS(templateFS))
+	})
 	configAPI := bindAuthMiddleware(api, opts)
 	api.Static("/videos", videoDir)
 
@@ -468,6 +484,9 @@ func StartWithOptions(port string, opts StartOptions) {
 	}
 	urlStr := "http://" + urlHost + ":" + port + RoutePrefix
 	fmt.Printf("Web started at %s\n", urlStr)
+	if opts.DisableAuth {
+		go warmPlaylistCategoryCache()
+	}
 	if opts.ShouldOpenBrowser {
 		go func() { time.Sleep(500 * time.Millisecond); core.OpenBrowser(urlStr) }()
 	}

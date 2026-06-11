@@ -494,7 +494,10 @@ function buildCoverDownloadURL(song) {
         return `${API_ROOT}/local_music/cover?${params.toString()}`;
     }
 
-    params.set('url', String(song?.cover || 'https://via.placeholder.com/600?text=No+Cover'));
+    if (!String(song?.cover || '').trim()) {
+        return `${API_ROOT}/icon.png`;
+    }
+    params.set('url', String(song.cover));
     params.set('name', String(song?.name || ''));
     params.set('artist', String(song?.artist || ''));
     params.set('save_local', '1');
@@ -527,18 +530,30 @@ function withSaveLocalParam(url) {
 }
 
 async function requestLocalDownload(url) {
-    const response = await fetch(withSaveLocalParam(url), {
-        method: 'POST',
-        headers: {
-            'Accept': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const timeoutID = window.setTimeout(() => controller?.abort(), 90000);
+    try {
+        const response = await fetch(withSaveLocalParam(url), {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            signal: controller?.signal
+        });
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data || data.error) {
+            throw new Error((data && data.error) || '保存失败');
         }
-    });
-    const data = await response.json().catch(() => null);
-    if (!response.ok || !data || data.error) {
-        throw new Error((data && data.error) || '保存失败');
+        return data;
+    } catch (error) {
+        if (controller?.signal.aborted) {
+            throw new Error('下载超时，请检查网络后重试');
+        }
+        throw error;
+    } finally {
+        window.clearTimeout(timeoutID);
     }
-    return data;
 }
 
 function formatBatchSongLabel(song) {
@@ -587,6 +602,14 @@ function showToast(title, message = '', type = 'info', duration = 5000) {
         window.setTimeout(close, duration);
     }
 }
+
+window.alert = (message) => {
+    const text = String(message || '');
+    const type = /失败|错误|缺少|无法/.test(text)
+        ? 'error'
+        : (/成功|完成|已/.test(text) ? 'success' : 'info');
+    showToast('提示', text, type, 7000);
+};
 
 function inferExtFromContentType(contentType) {
     const raw = String(contentType || '').toLowerCase().split(';')[0].trim();
@@ -661,15 +684,65 @@ async function requestBrowserDownload(song) {
     };
 }
 
+let actionConfirmResolve = null;
+
+function closeActionConfirm(confirmed) {
+    const modal = document.getElementById('actionConfirmModal');
+    modal?.classList.remove('active');
+    if (actionConfirmResolve) {
+        const resolve = actionConfirmResolve;
+        actionConfirmResolve = null;
+        resolve(!!confirmed);
+    }
+}
+
+function showActionConfirm(title, message, confirmLabel = '继续') {
+    const modal = document.getElementById('actionConfirmModal');
+    const titleEl = document.getElementById('actionConfirmTitle');
+    const messageEl = document.getElementById('actionConfirmMessage');
+    const submitEl = document.getElementById('actionConfirmSubmit');
+    if (!modal || !titleEl || !messageEl || !submitEl) {
+        return Promise.resolve(false);
+    }
+
+    if (actionConfirmResolve) {
+        actionConfirmResolve(false);
+    }
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+    submitEl.textContent = confirmLabel;
+    modal.classList.add('active');
+
+    return new Promise(resolve => {
+        actionConfirmResolve = resolve;
+        window.setTimeout(() => submitEl.focus(), 0);
+    });
+}
+
 async function handleDownloadClick(link) {
     if (!link) {
         return false;
     }
 
+    const card = link.closest('.song-row');
+    const sizeBytes = parseSizeToBytes(card?.dataset.sortSize || '');
+    if (sizeBytes >= 50 * 1024 * 1024) {
+        const sizeLabel = sizeBytes >= 1024 ** 3
+            ? `${(sizeBytes / (1024 ** 3)).toFixed(1)} GB`
+            : `${(sizeBytes / (1024 ** 2)).toFixed(1)} MB`;
+        const confirmed = await showActionConfirm(
+            '确认下载大文件',
+            `该文件约 ${sizeLabel}，保存到本地可能需要较长时间。`,
+            '继续下载'
+        );
+        if (!confirmed) {
+            return false;
+        }
+    }
+
     link.style.pointerEvents = 'none';
     link.style.opacity = '0.6';
     
-    const card = link.closest('.song-row');
     const song = card ? songFromCard(card) : songFromURL(link.href);
     const downloadEntry = DownloadManager.add(song);
 
@@ -1483,6 +1556,7 @@ function renderLocalMusicPageCard(track) {
             data-sort-bitrate="${parsePositiveInt(song.extra?.bitrate, 0)}"
             data-rel-path="${escapeHTML(track?.rel_path || '')}"
             oncontextmenu="showSongRowContextMenu(event, this)"
+            ondblclick="playSongRowOnDblClick(this)"
             data-extra='${escapeHTML(extraJSON)}'>
             
             <div class="checkbox-wrapper" style="width:22px;">
@@ -1491,7 +1565,7 @@ function renderLocalMusicPageCard(track) {
             
             <div class="song-col song-col--art">
                 ${coverHTML}
-                <div class="song-art-overlay" onclick="playAllAndJumpTo(this.closest('.song-row'))">
+                <div class="song-art-overlay" onclick="event.stopPropagation(); playAllAndJumpTo(this.closest('.song-row'))">
                     <i class="fa-solid fa-play"></i>
                 </div>
             </div>
@@ -1512,16 +1586,11 @@ function renderLocalMusicPageCard(track) {
             
             <div class="song-col song-col--actions">
                 <div class="song-actions">
-                    <button type="button" class="btn-circle btn-play" title="播放" onclick="playAllAndJumpTo(this)">
-                        <i class="fa-solid fa-play"></i>
-                    </button>
                     <button type="button" class="btn-circle btn-fav" title="收藏" onclick="openAddToCollectionModal(this)">
                         <i class="fa-regular fa-heart"></i>
                     </button>
-                    ${lyricButton}
-                    ${coverButton}
-                    <button type="button" class="btn-circle btn-delete-local danger" title="删除" onclick="deleteLocalMusicFromButton(this)">
-                        <i class="fa-solid fa-trash"></i>
+                    <button type="button" class="btn-circle btn-more" title="更多" onclick="event.stopPropagation(); showSongRowMoreMenu(event, this)">
+                        <i class="fa-solid fa-ellipsis"></i>
                     </button>
                 </div>
             </div>
@@ -3917,7 +3986,7 @@ function updateCardWithSong(card, song, options = {}) {
             const placeholder = coverWrap.querySelector('.song-art-placeholder');
             if (placeholder) placeholder.remove();
         }
-        imgEl.src = song.cover || 'https://via.placeholder.com/150?text=Music';
+        imgEl.src = song.cover || `${API_ROOT}/icon.png`;
         imgEl.alt = song.name || '';
         
         coverWrap.onclick = (e) => {
@@ -4392,7 +4461,11 @@ async function batchDownload() {
     const originalBatchDlHTML = batchDl ? batchDl.innerHTML : '';
 
     const skipText = skippedLocalCount > 0 ? `\n已跳过 ${skippedLocalCount} 首本地歌曲。` : '';
-    if (!confirm(`准备将 ${songs.length} 首歌曲保存到本地目录:\n${webSettings.downloadDir}${skipText}`)) {
+    if (!await showActionConfirm(
+        '确认批量下载',
+        `准备将 ${songs.length} 首歌曲保存到本地目录：\n${webSettings.downloadDir}${skipText}`,
+        '开始下载'
+    )) {
         return;
     }
 
@@ -4469,17 +4542,25 @@ async function deleteLocalMusic(trackId) {
     return payload;
 }
 
-function confirmLocalMusicDeletion(songs) {
+async function confirmLocalMusicDeletion(songs) {
     const items = Array.isArray(songs) ? songs : [];
     if (items.length === 0) return false;
 
     const names = items.slice(0, 5).map(formatBatchSongLabel).join('\n');
     const more = items.length > 5 ? `\n...等 ${items.length} 首` : '';
     const scope = items.length === 1 ? `《${formatBatchSongLabel(items[0])}》` : `${items.length} 首本地音乐`;
-    if (!confirm(`准备删除 ${scope}。\n删除后文件会从本地下载目录移除，且不可恢复。\n\n${names}${more}`)) {
+    if (!await showActionConfirm(
+        '确认删除本地音乐',
+        `准备删除 ${scope}。\n删除后文件会从本地下载目录移除，且不可恢复。\n\n${names}${more}`,
+        '下一步'
+    )) {
         return false;
     }
-    return confirm(`再次确认：确定永久删除 ${scope} 吗？`);
+    return showActionConfirm(
+        '再次确认永久删除',
+        `确定永久删除 ${scope} 吗？此操作不可恢复。`,
+        '永久删除'
+    );
 }
 
 function stopDeletedLocalMusicPlayback(deletedIds) {
@@ -4498,7 +4579,7 @@ async function deleteLocalMusicFromButton(btn) {
     const card = btn?.closest('.song-row');
     const song = songFromCard(card);
     if (!song || !isLocalMusicSourceValue(song.source)) return;
-    if (!confirmLocalMusicDeletion([song])) return;
+    if (!await confirmLocalMusicDeletion([song])) return;
 
     const originalHTML = btn.innerHTML;
     btn.disabled = true;
@@ -4522,7 +4603,7 @@ async function batchDeleteLocalMusic() {
     const songs = getSelectedSongs().filter(song => isLocalMusicSourceValue(song.source));
     if (songs.length === 0) return;
 
-    if (!confirmLocalMusicDeletion(songs)) {
+    if (!await confirmLocalMusicDeletion(songs)) {
         return;
     }
 
@@ -4585,8 +4666,15 @@ async function batchSwitchSource(options = {}) {
     }
 
     const skipText = skippedLocalCount > 0 ? `\n已跳过 ${skippedLocalCount} 首本地歌曲。` : '';
-    if (!options.skipConfirm && !confirm(`准备对 ${cards.length} 首歌曲进行自动换源。\n这可能需要一些时间，请耐心等待。${skipText}`)) {
-        return false;
+    if (!options.skipConfirm) {
+        const confirmed = await showActionConfirm(
+            '确认批量换源',
+            `准备对 ${cards.length} 首歌曲进行自动换源。\n这可能需要一些时间，请耐心等待。${skipText}`,
+            '开始换源'
+        );
+        if (!confirmed) {
+            return false;
+        }
     }
 
     const batchSwitch = document.getElementById('btn-batch-switch');
@@ -4623,7 +4711,11 @@ async function batchRemoveFromCollection(colId) {
     const songs = getSelectedSongs();
     if (!id || songs.length === 0) return;
 
-    if (!confirm(`确定从当前自建歌单中取消收藏 ${songs.length} 首歌曲吗？`)) {
+    if (!await showActionConfirm(
+        '确认移出歌单',
+        `确定从当前自建歌单中取消收藏 ${songs.length} 首歌曲吗？`,
+        '移出'
+    )) {
         return;
     }
 
@@ -4990,6 +5082,23 @@ function openLocalMusicPage() {
     navigateTo(API_ROOT + '/local_music_page');
 }
 
+function filterLocalMusic(query) {
+    const q = query.toLowerCase().trim();
+    const list = document.getElementById('localMusicPageList');
+    if (!list) return;
+    const rows = list.querySelectorAll('.song-row');
+    rows.forEach(row => {
+        const name = (row.dataset.name || '').toLowerCase();
+        const artist = (row.dataset.artist || '').toLowerCase();
+        const album = (row.dataset.album || '').toLowerCase();
+        if (name.includes(q) || artist.includes(q) || album.includes(q)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
 function showEditCollectionModal(id = '', name = '', desc = '', cover = '') {
     document.getElementById('editColTitle').textContent = id ? '编辑歌单' : '新建歌单';
     document.getElementById('editColId').value = id;
@@ -5103,8 +5212,12 @@ function importCollectionFromButton(btn) {
     });
 }
 
-function deleteCollection(id) {
-    if (!confirm('确定删除此歌单吗？内部歌曲记录也将被清空。')) return;
+async function deleteCollection(id) {
+    if (!await showActionConfirm(
+        '确认删除歌单',
+        '确定删除此歌单吗？内部歌曲记录也将被清空。',
+        '删除'
+    )) return;
     fetch(`${API_ROOT}/collections/${id}`, { method: 'DELETE' })
         .then(r => r.json())
         .then(res => {
@@ -5113,8 +5226,12 @@ function deleteCollection(id) {
         });
 }
 
-function deleteCollectionFromModal(id) {
-    if (!confirm('确定删除此歌单吗？内部歌曲记录也将被清空。')) return;
+async function deleteCollectionFromModal(id) {
+    if (!await showActionConfirm(
+        '确认删除歌单',
+        '确定删除此歌单吗？内部歌曲记录也将被清空。',
+        '删除'
+    )) return;
     fetch(`${API_ROOT}/collections/${id}`, { method: 'DELETE' })
         .then(r => r.json())
         .then(res => {
@@ -5220,8 +5337,12 @@ function addSongToCollection(colId) {
     });
 }
 
-function removeSongFromCollection(btn, colId, originalSongId, originalSource) {
-    if (!confirm('确定将此歌曲移出当前歌单吗？')) return;
+async function removeSongFromCollection(btn, colId, originalSongId, originalSource) {
+    if (!await showActionConfirm(
+        '确认移出歌曲',
+        '确定将此歌曲移出当前歌单吗？',
+        '移出'
+    )) return;
     fetch(`${API_ROOT}/collections/${colId}/songs?id=${encodeURIComponent(originalSongId)}&source=${encodeURIComponent(originalSource)}`, { method: 'DELETE' })
         .then(r => r.json())
         .then(res => {
@@ -5498,7 +5619,9 @@ window.showDownloadsPage = showDownloadsPage;
 
 async function revealInFolder(filePath) {
     try {
-        const response = await fetch(`${API_ROOT}/reveal?path=${encodeURIComponent(filePath)}`);
+        const response = await fetch(`${API_ROOT}/reveal?path=${encodeURIComponent(filePath)}`, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
         if (!response.ok) {
             const data = await response.json().catch(() => ({}));
             showToast('打开失败', data.error || '无法打开文件位置', 'error');
@@ -5511,7 +5634,9 @@ window.revealInFolder = revealInFolder;
 
 async function openDownloadFolder() {
     try {
-        const response = await fetch(`${API_ROOT}/reveal`);
+        const response = await fetch(`${API_ROOT}/reveal`, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
         if (!response.ok) {
             const data = await response.json().catch(() => ({}));
             showToast('打开失败', data.error || '无法打开下载文件夹', 'error');
@@ -5552,14 +5677,32 @@ async function deleteLocalMusicDirect(id, name, artist) {
 }
 window.deleteLocalMusicDirect = deleteLocalMusicDirect;
 
-function showSongRowContextMenu(event, itemEl) {
+function playSongRowOnDblClick(rowEl) {
+    playAllAndJumpTo(rowEl);
+}
+window.playSongRowOnDblClick = playSongRowOnDblClick;
+
+function showSongRowMoreMenu(event, btnEl) {
     event.preventDefault();
+    event.stopPropagation();
+    const rowEl = btnEl.closest('.song-row');
+    if (!rowEl) return;
+    showSongRowContextMenu(event, rowEl, btnEl);
+}
+window.showSongRowMoreMenu = showSongRowMoreMenu;
+
+function showSongRowContextMenu(event, itemEl, anchorEl = null) {
+    event.preventDefault();
+    if (event.stopPropagation) event.stopPropagation();
+
     const id = itemEl.dataset.id;
     const source = itemEl.dataset.source;
     const isLocal = isLocalMusicSourceValue(source);
     const relPath = itemEl.dataset.relPath || '';
     const name = itemEl.dataset.name || '';
     const artist = itemEl.dataset.artist || '';
+    const canRemove = itemEl.dataset.canRemove === 'true';
+    const colId = itemEl.dataset.colId || '';
 
     // Remove any existing context menu
     document.querySelectorAll('.download-context-menu').forEach(m => m.remove());
@@ -5574,6 +5717,9 @@ function showSongRowContextMenu(event, itemEl) {
         <button class="download-context-item" data-action="add-playlist">
             <i class="fa-solid fa-heart"></i> 添加到自制歌单
         </button>
+        <button class="download-context-item" data-action="videogen">
+            <i class="fa-solid fa-clapperboard"></i> 视频创作 (VideoGen)
+        </button>
         <div class="download-context-divider"></div>
     `;
 
@@ -5585,6 +5731,16 @@ function showSongRowContextMenu(event, itemEl) {
             <button class="download-context-item" data-action="copy-path">
                 <i class="fa-solid fa-copy"></i> 复制文件路径
             </button>
+        `;
+        if (canRemove) {
+            menuItems += `
+                <div class="download-context-divider"></div>
+                <button class="download-context-item danger" data-action="remove-collection">
+                    <i class="fa-solid fa-trash-can"></i> 移出当前歌单
+                </button>
+            `;
+        }
+        menuItems += `
             <div class="download-context-divider"></div>
             <button class="download-context-item danger" data-action="delete-local">
                 <i class="fa-solid fa-trash"></i> 删除本地文件
@@ -5593,7 +5749,10 @@ function showSongRowContextMenu(event, itemEl) {
     } else {
         menuItems += `
             <button class="download-context-item" data-action="download">
-                <i class="fa-solid fa-download"></i> 下载歌曲
+                <i class="fa-solid fa-download"></i> 下载并保存到本地
+            </button>
+            <button class="download-context-item" data-action="browser-download">
+                <i class="fa-solid fa-cloud-arrow-down"></i> 浏览器直接下载
             </button>
             <button class="download-context-item" data-action="download-lyric">
                 <i class="fa-solid fa-file-lines"></i> 下载歌词
@@ -5602,11 +5761,26 @@ function showSongRowContextMenu(event, itemEl) {
                 <i class="fa-regular fa-image"></i> 下载封面
             </button>
         `;
+        if (canRemove) {
+            menuItems += `
+                <div class="download-context-divider"></div>
+                <button class="download-context-item danger" data-action="remove-collection">
+                    <i class="fa-solid fa-trash-can"></i> 移出当前歌单
+                </button>
+            `;
+        }
     }
 
     menu.innerHTML = menuItems;
-    menu.style.left = `${event.clientX}px`;
-    menu.style.top = `${event.clientY}px`;
+
+    if (anchorEl) {
+        const rect = anchorEl.getBoundingClientRect();
+        menu.style.left = `${rect.left}px`;
+        menu.style.top = `${rect.bottom}px`;
+    } else {
+        menu.style.left = `${event.clientX}px`;
+        menu.style.top = `${event.clientY}px`;
+    }
     document.body.appendChild(menu);
 
     // Adjust if overflows viewport
@@ -5615,7 +5789,12 @@ function showSongRowContextMenu(event, itemEl) {
         menu.style.left = `${window.innerWidth - rect.width - 8}px`;
     }
     if (rect.bottom > window.innerHeight) {
-        menu.style.top = `${window.innerHeight - rect.height - 8}px`;
+        if (anchorEl) {
+            const btnRect = anchorEl.getBoundingClientRect();
+            menu.style.top = `${btnRect.top - rect.height}px`;
+        } else {
+            menu.style.top = `${window.innerHeight - rect.height - 8}px`;
+        }
     }
 
     menu.addEventListener('click', (e) => {
@@ -5624,11 +5803,25 @@ function showSongRowContextMenu(event, itemEl) {
         const action = btn.dataset.action;
 
         if (action === 'play') {
-            const playBtn = itemEl.querySelector('.play-btn');
-            if (playBtn) playBtn.click();
+            playAllAndJumpTo(itemEl);
         } else if (action === 'add-playlist') {
-            const addBtn = itemEl.querySelector('.actions button[title="收藏到自制歌单"]');
-            if (addBtn) addBtn.click();
+            const favBtn = itemEl.querySelector('.btn-fav') || itemEl;
+            openAddToCollectionModal(favBtn);
+        } else if (action === 'videogen') {
+            if (window.VideoGen) {
+                const img = itemEl.querySelector('img.song-art');
+                const currentCover = img ? img.src : (itemEl.dataset.cover || '');
+                window.VideoGen.open({
+                    id: id,
+                    source: source,
+                    name: name,
+                    artist: artist,
+                    album: itemEl.dataset.album || '',
+                    cover: currentCover,
+                    duration: parseInt(itemEl.dataset.duration) || 0,
+                    extra: itemEl.dataset.extra || ''
+                });
+            }
         } else if (action === 'reveal') {
             revealInFolder(relPath);
         } else if (action === 'copy-path') {
@@ -5639,30 +5832,20 @@ function showSongRowContextMenu(event, itemEl) {
                 showToast('复制失败', '浏览器不支持剪贴板操作', 'error');
             });
         } else if (action === 'delete-local') {
-            const delBtn = itemEl.querySelector('.actions button.danger[title="删除本地音乐"]');
-            if (delBtn) {
-                delBtn.click();
-            } else {
-                deleteLocalMusicDirect(id, name, artist);
-            }
+            deleteLocalMusicFromButton(itemEl);
+        } else if (action === 'remove-collection') {
+            removeSongFromCollection(itemEl, colId, id, source);
         } else if (action === 'download') {
-            const dlBtn = itemEl.querySelector('.btn-dl:not(.btn-browser-download):not(.btn-lyric):not(.btn-cover)');
-            if (dlBtn) dlBtn.click();
+            const url = `${API_ROOT}/download?id=${encodeURIComponent(id)}&source=${encodeURIComponent(source)}&name=${encodeURIComponent(name)}&artist=${encodeURIComponent(artist)}&album=${encodeURIComponent(itemEl.dataset.album || '')}&cover=${encodeURIComponent(itemEl.dataset.cover || '')}&extra=${encodeURIComponent(itemEl.dataset.extra || '')}`;
+            window.open(url, '_blank');
+        } else if (action === 'browser-download') {
+            const url = `${API_ROOT}/download?id=${encodeURIComponent(id)}&source=${encodeURIComponent(source)}&name=${encodeURIComponent(name)}&artist=${encodeURIComponent(artist)}&album=${encodeURIComponent(itemEl.dataset.album || '')}&cover=${encodeURIComponent(itemEl.dataset.cover || '')}&extra=${encodeURIComponent(itemEl.dataset.extra || '')}`;
+            window.open(url, '_blank');
         } else if (action === 'download-lyric') {
-            const lrcLink = itemEl.querySelector('.btn-lyric');
-            if (lrcLink) {
-                lrcLink.click();
-            } else {
-                window.open(`${API_ROOT}/download_lrc?id=${encodeURIComponent(id)}&source=${encodeURIComponent(source)}&name=${encodeURIComponent(name)}&artist=${encodeURIComponent(artist)}`);
-            }
+            window.open(`${API_ROOT}/download_lrc?id=${encodeURIComponent(id)}&source=${encodeURIComponent(source)}&name=${encodeURIComponent(name)}&artist=${encodeURIComponent(artist)}&album=${encodeURIComponent(itemEl.dataset.album || '')}&duration=${encodeURIComponent(itemEl.dataset.duration || '')}&extra=${encodeURIComponent(itemEl.dataset.extra || '')}`, '_blank');
         } else if (action === 'download-cover') {
-            const coverLink = itemEl.querySelector('.btn-cover');
-            if (coverLink) {
-                coverLink.click();
-            } else {
-                const coverUrl = itemEl.dataset.cover || '';
-                window.open(`${API_ROOT}/download_cover?url=${encodeURIComponent(coverUrl)}&name=${encodeURIComponent(name)}&artist=${encodeURIComponent(artist)}`);
-            }
+            const coverUrl = itemEl.dataset.cover || '';
+            window.open(`${API_ROOT}/download_cover?url=${encodeURIComponent(coverUrl)}&name=${encodeURIComponent(name)}&artist=${encodeURIComponent(artist)}`, '_blank');
         }
         menu.remove();
     });
@@ -5773,10 +5956,17 @@ window.showDownloadContextMenu = showDownloadContextMenu;
 
 async function deleteDownloadFile(filePath, itemId) {
     if (!filePath) return;
-    if (!confirm(`确定要删除本地文件吗？\n${filePath}`)) return;
+    if (!await showActionConfirm(
+        '确认删除下载文件',
+        `确定要删除本地文件吗？\n${filePath}`,
+        '删除文件'
+    )) return;
 
     try {
-        const response = await fetch(`${API_ROOT}/delete_file?path=${encodeURIComponent(filePath)}`, { method: 'POST' });
+        const response = await fetch(`${API_ROOT}/delete_file?path=${encodeURIComponent(filePath)}`, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
             showToast('删除失败', data.error || '无法删除文件', 'error');
@@ -5795,8 +5985,12 @@ async function deleteDownloadFile(filePath, itemId) {
 }
 window.deleteDownloadFile = deleteDownloadFile;
 
-function clearDownloadHistory() {
-    if (confirm('确定要清空全部已下载历史记录吗？')) {
+async function clearDownloadHistory() {
+    if (await showActionConfirm(
+        '确认清空下载记录',
+        '确定要清空全部已下载历史记录吗？本地文件不会被删除。',
+        '清空记录'
+    )) {
         DownloadManager.clearHistory();
     }
 }
